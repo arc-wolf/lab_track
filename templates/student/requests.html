@@ -1,0 +1,45 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<h3 class="mb-4">Active Borrow Requests</h3>
+
+<div class="table-responsive glass-panel p-3">
+<table class="table table-striped mb-0">
+    <thead>
+        <tr>
+            <th>Slip ID</th>
+            <th>Faculty</th>
+            <th>Counsellor</th>
+            <th>Items</th>
+            <th>Created</th>
+            <th>Due Date</th>
+            <th>PDF</th>
+            <th>Status</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for slip in slips %}
+        <tr>
+            <td>{{ slip.id }}</td>
+            <td>{% if slip.faculty %}{{ slip.faculty.username }}{% else %}-{% endif %}</td>
+            <td>{{ slip.counsellor }}</td>
+            <td>
+                {% for item in slip.items.all %}
+                    {{ item.component.name }} ({{ item.quantity }})<br>
+                {% endfor %}
+            </td>
+            <td>{{ slip.created_at }}</td>
+            <td>{{ slip.due_date|default:"—" }}</td>
+            <td><a href="{% url 'download_slip' slip.id %}" class="btn btn-sm btn-outline-light">PDF</a></td>
+            <td>{{ slip.status }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="6">No active requests.</td></tr>
+        {% endfor %}
+    </tbody>
+</table>
+</div>
+
+<a href="{% url 'student_dashboard' %}" class="btn btn-secondary">Back to Components</a>
+
+{% endblock %}

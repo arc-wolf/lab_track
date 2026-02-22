@@ -1,0 +1,146 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-12 signup-shell">
+        <div class="glass-panel p-4">
+        <h3 class="mb-2 text-center">Create your LabTrack account</h3>
+        <p class="text-center text-muted mb-4 small">Use your official Amrita email to auto-classify as Student or Faculty/Staff.</p>
+
+        {% if form.errors %}
+        <div class="alert alert-warning">
+            <strong>Fix the issues below:</strong>
+            <ul class="mb-0">
+                {% for field, errs in form.errors.items %}
+                    {% for err in errs %}
+                    <li>{{ field|capfirst }}: {{ err }}</li>
+                    {% endfor %}
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+        <form method="post" id="signup-form">
+            {% csrf_token %}
+            {{ form.non_field_errors }}
+            <div class="mb-3">
+                <label class="form-label">Username</label>
+                {{ form.username }}
+                {{ form.username.errors }}
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Organization Email</label>
+                {{ form.email }}
+                <small id="domain-hint" class="text-danger d-none">Use your official Amrita email (@am.amrita.edu or @am.students.amrita.edu).</small>
+                {{ form.email.errors }}
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Phone</label>
+                {{ form.phone }}
+                {{ form.phone.errors }}
+            </div>
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label">Password</label>
+                    {{ form.password1 }}
+                    {{ form.password1.errors }}
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Confirm Password</label>
+                    {{ form.password2 }}
+                    {{ form.password2.errors }}
+                </div>
+            </div>
+
+            <!-- micro front-end style split -->
+            <div id="student-section" class="mt-4 d-none">
+                <p class="fw-bold text-warning mb-2">Section B: Student Details</p>
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <label class="form-label">Semester</label>
+                        {{ form.semester }}
+                        {{ form.semester.errors }}
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Class</label>
+                        {{ form.student_class }}
+                        {{ form.student_class.errors }}
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Group ID</label>
+                        {{ form.group_id }}
+                        {{ form.group_id.errors }}
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Group Name</label>
+                        {{ form.group_name }}
+                        {{ form.group_name.errors }}
+                    </div>
+                    <div class="col-md-12">
+                        <label class="form-label">Faculty Incharge</label>
+                        {{ form.faculty_incharge }}
+                        {{ form.faculty_incharge.errors }}
+                    </div>
+                </div>
+            </div>
+
+            <div id="faculty-section" class="mt-4 d-none">
+                <p class="fw-bold text-info mb-2">Section B: Faculty/Staff Details</p>
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label">Full Name</label>
+                        {{ form.full_name }}
+                        {{ form.full_name.errors }}
+                    </div>
+                </div>
+            </div>
+
+            <button class="btn btn-primary w-100 mt-4">Sign Up</button>
+        </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    (() => {
+        const emailInput = document.querySelector('#id_email');
+        const studentSection = document.getElementById('student-section');
+        const facultySection = document.getElementById('faculty-section');
+        const domainHint = document.getElementById('domain-hint');
+
+        function classify() {
+            const email = (emailInput.value || '').toLowerCase();
+            if (email.endsWith('@am.students.amrita.edu')) {
+                studentSection.classList.remove('d-none');
+                facultySection.classList.add('d-none');
+                domainHint.classList.add('d-none');
+                setRequired(studentSection, true);
+                setRequired(facultySection, false);
+            } else if (email.endsWith('@am.amrita.edu')) {
+                facultySection.classList.remove('d-none');
+                studentSection.classList.add('d-none');
+                domainHint.classList.add('d-none');
+                setRequired(studentSection, false);
+                setRequired(facultySection, true);
+            } else {
+                studentSection.classList.add('d-none');
+                facultySection.classList.add('d-none');
+                domainHint.classList.remove('d-none');
+                setRequired(studentSection, false);
+                setRequired(facultySection, false);
+            }
+        }
+
+        function setRequired(container, state) {
+            container.querySelectorAll('input, select').forEach(el => {
+                if (state) {
+                    el.setAttribute('required', 'required');
+                } else {
+                    el.removeAttribute('required');
+                }
+            });
+        }
+
+        emailInput?.addEventListener('input', classify);
+        classify();
+    })();
+</script>
+{% endblock %}

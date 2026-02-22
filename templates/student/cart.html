@@ -1,0 +1,57 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<h3 class="mb-3">Your Cart</h3>
+
+<div class="glass-panel p-3 table-responsive">
+<table class="table align-middle mb-0">
+    <thead>
+        <tr>
+            <th>Component</th>
+            <th>Quantity</th>
+            <th>Remove</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for item in cart_items %}
+        <tr>
+            <td>{{ item.component.name }}</td>
+            <td>{{ item.quantity }}</td>
+            <td>
+                <a href="{% url 'remove_cart_item' item.id %}" class="btn btn-danger btn-sm">
+                    Remove
+                </a>
+            </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="3">Cart is empty.</td></tr>
+        {% endfor %}
+    </tbody>
+</table>
+</div>
+
+<form method="POST" action="{% url 'generate_slip' %}">
+    {% csrf_token %}
+
+    <div class="mb-3">
+        <label class="form-label">Faculty Incharge</label>
+        <select name="faculty" class="form-select" required>
+            {% for faculty in faculties %}
+            <option value="{{ faculty.id }}">{{ faculty.user.username }}</option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label">Counsellor</label>
+        <input type="text" name="counsellor" class="form-control" placeholder="Enter counsellor name" required>
+    </div>
+
+    <button class="btn btn-success w-100">
+        Generate Borrow Slip
+    </button>
+</form>
+
+<a href="{% url 'student_requests' %}" class="btn btn-link mt-3">View Active Requests</a>
+
+{% endblock %}

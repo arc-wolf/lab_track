@@ -1,0 +1,99 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-2">
+    <div>
+        <h3 class="mb-1">Lab Admin Console</h3>
+        <small class="text-muted">Track requests, restore stock, and manage inventory</small>
+    </div>
+    <div class="d-flex gap-2">
+        <a href="{% url 'admin_components' %}" class="btn btn-primary">Manage Inventory</a>
+    </div>
+</div>
+
+{% with total=slips|length %}
+<div class="row g-3 mb-4">
+    <div class="col-md-4">
+        <div class="card h-100">
+            <div class="card-body">
+                <p class="text-muted mb-1">Active Requests</p>
+                <h3 class="mb-0">{{ total }}</h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card h-100">
+            <div class="card-body">
+                <p class="text-muted mb-1">Awaiting Return</p>
+                <h3 class="mb-0">{{ slips|length }}</h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card h-100">
+            <div class="card-body">
+                <p class="text-muted mb-1">Last Update</p>
+                <h3 class="mb-0">{% now "M j, Y — h:i A" %}</h3>
+            </div>
+        </div>
+    </div>
+</div>
+{% endwith %}
+
+<div class="glass-panel p-3">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h5 class="mb-0">Active Borrow Requests</h5>
+        <div class="d-flex gap-2 align-items-center">
+            <a href="{% url 'admin_groups' %}" class="btn btn-secondary btn-sm">Manage Groups</a>
+            <span class="badge bg-light text-dark">{{ slips|length }} open</span>
+        </div>
+    </div>
+    <div class="table-responsive">
+        <table class="table align-middle mb-0">
+            <thead>
+                <tr>
+                    <th>Slip</th>
+                    <th>Student</th>
+                    <th>Items</th>
+                    <th>Due</th>
+                    <th>Actions</th>
+                    <th>PDF</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for slip in slips %}
+                <tr>
+                    <td>#{{ slip.id }}</td>
+                    <td>{{ slip.student.username }}</td>
+                    <td class="small">
+                        {% for item in slip.items.all %}
+                            <span class="badge bg-secondary text-uppercase mb-1">{{ item.component.name }} ({{ item.quantity }})</span><br>
+                        {% endfor %}
+                    </td>
+                    <td>{{ slip.due_date|default:"—" }}</td>
+                    <td>
+                        <div class="d-flex gap-2">
+                            {% if slip.status == 'PENDING' %}
+                            <a href="{% url 'approve_slip' slip.id %}" class="btn btn-primary btn-sm">
+                                Approve
+                            </a>
+                            {% endif %}
+                            <a href="{% url 'mark_returned' slip.id %}" class="btn btn-success btn-sm">
+                                Mark Returned
+                            </a>
+                            <a href="{% url 'terminate_slip' slip.id %}" class="btn btn-danger btn-sm">
+                                Terminate
+                            </a>
+                        </div>
+                    </td>
+                    <td><a href="{% url 'download_slip' slip.id %}" class="btn btn-sm btn-outline-light">PDF</a></td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="5">No active borrow requests.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% endblock %}

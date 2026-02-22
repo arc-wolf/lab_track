@@ -1,0 +1,25 @@
+# Python / Django
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.sqlite3
+db.sqlite3
+
+# Virtualenv
+venv/
+.venv/
+
+# Django static
+staticfiles/
+media/
+
+# Celery beat schedule
+celerybeat-schedule*
+
+# VSCode / IDE
+.vscode/
+.idea/
+
+# Migrations cache
+*.log

@@ -1,0 +1,54 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<h3 class="mb-3">Student Requests Under You</h3>
+
+<div class="d-flex justify-content-end mb-3 gap-2">
+    <a href="{% url 'student_dashboard' %}" class="btn btn-primary">Request Components</a>
+    <a href="{% url 'faculty_groups' %}" class="btn btn-secondary">Approve Groups</a>
+</div>
+
+<div class="table-responsive glass-panel p-3">
+<table class="table table-striped align-middle mb-0">
+    <thead>
+        <tr>
+            <th>Student</th>
+            <th>Slip ID</th>
+            <th>Date</th>
+            <th>Status</th>
+            <th>Items</th>
+            <th>Due</th>
+            <th>Actions</th>
+            <th>PDF</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for slip in slips %}
+        <tr>
+            <td>{{ slip.student.username }}</td>
+            <td>{{ slip.id }}</td>
+            <td>{{ slip.created_at }}</td>
+            <td>{{ slip.status }}</td>
+            <td>
+                {% for item in slip.items.all %}
+                    {{ item.component.name }} ({{ item.quantity }})<br>
+                {% endfor %}
+            </td>
+            <td>{{ slip.due_date|default:"—" }}</td>
+            <td>
+                {% if slip.status == 'PENDING' %}
+                <a href="{% url 'approve_slip' slip.id %}" class="btn btn-success btn-sm">Approve</a>
+                {% else %}
+                <span class="text-muted small">Processed</span>
+                {% endif %}
+            </td>
+            <td><a href="{% url 'download_slip' slip.id %}" class="btn btn-sm btn-outline-light">PDF</a></td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="8">No active requests.</td></tr>
+        {% endfor %}
+    </tbody>
+</table>
+</div>
+
+{% endblock %}

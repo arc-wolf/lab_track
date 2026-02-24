@@ -1,45 +1,56 @@
 {% extends 'base.html' %}
 {% block content %}
 
-<h3 class="mb-4">Active Borrow Requests</h3>
+<section class="glass-panel p-4 mb-4">
+    <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
+        <div>
+            <div class="hero-eyebrow mb-1">My Requests</div>
+            <h4 class="mb-1 fw-bold">Active Borrow Slips</h4>
+            <p class="text-muted mb-0">Track approvals, due dates, and download PDFs.</p>
+        </div>
+        <a href="{% url 'student_dashboard' %}" class="btn btn-outline-primary btn-sm">Back to Components</a>
+    </div>
+</section>
 
-<div class="table-responsive glass-panel p-3">
-<table class="table table-striped mb-0">
-    <thead>
-        <tr>
-            <th>Slip ID</th>
-            <th>Faculty</th>
-            <th>Counsellor</th>
-            <th>Items</th>
-            <th>Created</th>
-            <th>Due Date</th>
-            <th>PDF</th>
-            <th>Status</th>
-        </tr>
-    </thead>
-    <tbody>
-        {% for slip in slips %}
-        <tr>
-            <td>{{ slip.id }}</td>
-            <td>{% if slip.faculty %}{{ slip.faculty.username }}{% else %}-{% endif %}</td>
-            <td>{{ slip.counsellor }}</td>
-            <td>
-                {% for item in slip.items.all %}
-                    {{ item.component.name }} ({{ item.quantity }})<br>
+<div class="glass-panel p-3">
+    {% if slips %}
+    <div class="table-responsive neo-table">
+        <table class="table align-middle mb-0 table-hover">
+            <thead>
+                <tr>
+                    <th>Slip</th>
+                    <th>Faculty</th>
+                    <th>Counsellor</th>
+                    <th>Items</th>
+                    <th>Created</th>
+                    <th>Due</th>
+                    <th>Status</th>
+                    <th>PDF</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for slip in slips %}
+                <tr>
+                    <td class="fw-semibold">#{{ slip.id }}</td>
+                    <td>{% if slip.faculty %}{{ slip.faculty.username }}{% else %}—{% endif %}</td>
+                    <td>{{ slip.counsellor }}</td>
+                    <td class="small">
+                        {% for item in slip.items.all %}
+                            <span class="badge bg-secondary text-uppercase mb-1">{{ item.component.name }} ({{ item.quantity }})</span><br>
+                        {% endfor %}
+                    </td>
+                    <td>{{ slip.created_at|date:"M j, Y" }}</td>
+                    <td>{{ slip.due_date|default:"—" }}</td>
+                    <td><span class="status-chip text-uppercase">{{ slip.status }}</span></td>
+                    <td><a href="{% url 'download_slip' slip.id %}" class="btn btn-sm btn-outline-primary">PDF</a></td>
+                </tr>
                 {% endfor %}
-            </td>
-            <td>{{ slip.created_at }}</td>
-            <td>{{ slip.due_date|default:"—" }}</td>
-            <td><a href="{% url 'download_slip' slip.id %}" class="btn btn-sm btn-outline-light">PDF</a></td>
-            <td>{{ slip.status }}</td>
-        </tr>
-        {% empty %}
-        <tr><td colspan="6">No active requests.</td></tr>
-        {% endfor %}
-    </tbody>
-</table>
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+        <div class="text-center py-4">No active requests.</div>
+    {% endif %}
 </div>
-
-<a href="{% url 'student_dashboard' %}" class="btn btn-secondary">Back to Components</a>
 
 {% endblock %}

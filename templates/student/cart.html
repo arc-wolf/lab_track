@@ -1,57 +1,82 @@
 {% extends 'base.html' %}
 {% block content %}
 
-<h3 class="mb-3">Your Cart</h3>
+<section class="glass-panel p-4 mb-4">
+    <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
+        <div>
+            <div class="hero-eyebrow mb-1">Your Borrow Cart</div>
+            <h3 class="mb-1 fw-bold">Finalize components before generating a slip</h3>
+            <p class="text-muted mb-0">Review items, choose faculty incharge, and add your counsellor.</p>
+        </div>
+        <div class="status-chip">{{ cart_items|length }} item{{ cart_items|length|pluralize }}</div>
+    </div>
+</section>
 
-<div class="glass-panel p-3 table-responsive">
-<table class="table align-middle mb-0">
-    <thead>
-        <tr>
-            <th>Component</th>
-            <th>Quantity</th>
-            <th>Remove</th>
-        </tr>
-    </thead>
-    <tbody>
-        {% for item in cart_items %}
-        <tr>
-            <td>{{ item.component.name }}</td>
-            <td>{{ item.quantity }}</td>
-            <td>
-                <a href="{% url 'remove_cart_item' item.id %}" class="btn btn-danger btn-sm">
-                    Remove
-                </a>
-            </td>
-        </tr>
-        {% empty %}
-        <tr><td colspan="3">Cart is empty.</td></tr>
-        {% endfor %}
-    </tbody>
-</table>
+<div class="glass-panel p-3 mb-4">
+    {% if cart_items %}
+    <div class="table-responsive neo-table">
+        <table class="table align-middle mb-0 table-hover">
+            <thead>
+                <tr>
+                    <th>Component</th>
+                    <th class="text-center">Quantity</th>
+                    <th class="text-end">Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in cart_items %}
+                <tr>
+                    <td class="fw-semibold">{{ item.component.name }}</td>
+                    <td class="text-center">
+                        <span class="badge bg-secondary">{{ item.quantity }}</span>
+                    </td>
+                    <td class="text-end">
+                        <a href="{% url 'remove_cart_item' item.id %}" class="btn btn-outline-danger btn-sm">Remove</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+        <div class="text-center py-4">
+            <p class="mb-2">Your cart is empty.</p>
+            <a href="{% url 'student_dashboard' %}" class="btn btn-primary btn-sm">Browse Components</a>
+        </div>
+    {% endif %}
 </div>
 
-<form method="POST" action="{% url 'generate_slip' %}">
+<div class="row g-3">
+    <div class="col-md-6">
+        <div class="glass-panel p-3 h-100">
+            <h6 class="mb-2 text-muted">Faculty Incharge</h6>
+            <p class="small text-muted mb-2">Select who will approve your slip.</p>
+            <select name="faculty" form="generateSlipForm" class="form-select" required>
+                {% for faculty in faculties %}
+                <option value="{{ faculty.id }}">{{ faculty.user.username }}</option>
+                {% endfor %}
+            </select>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="glass-panel p-3 h-100">
+            <h6 class="mb-2 text-muted">Counsellor</h6>
+            <p class="small text-muted mb-2">We need a counsellor name for record keeping.</p>
+            <input type="text" name="counsellor" form="generateSlipForm" class="form-control" placeholder="Enter counsellor name" required>
+        </div>
+    </div>
+</div>
+
+<form id="generateSlipForm" class="mt-4" method="POST" action="{% url 'generate_slip' %}">
     {% csrf_token %}
-
-    <div class="mb-3">
-        <label class="form-label">Faculty Incharge</label>
-        <select name="faculty" class="form-select" required>
-            {% for faculty in faculties %}
-            <option value="{{ faculty.id }}">{{ faculty.user.username }}</option>
-            {% endfor %}
-        </select>
-    </div>
-
-    <div class="mb-3">
-        <label class="form-label">Counsellor</label>
-        <input type="text" name="counsellor" class="form-control" placeholder="Enter counsellor name" required>
-    </div>
-
-    <button class="btn btn-success w-100">
+    <button class="btn btn-success w-100 py-3" {% if not cart_items %}disabled{% endif %}>
         Generate Borrow Slip
     </button>
 </form>
 
-<a href="{% url 'student_requests' %}" class="btn btn-link mt-3">View Active Requests</a>
+<div class="d-flex justify-content-between align-items-center mt-3">
+    <a href="{% url 'student_dashboard' %}" class="btn btn-link">Back to components</a>
+    <a href="{% url 'student_requests' %}" class="btn btn-outline-primary btn-sm">View Active Requests</a>
+</div>
 
 {% endblock %}

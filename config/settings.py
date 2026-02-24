@@ -10,6 +10,8 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 
+import os
+import sys
 from pathlib import Path
 
 from celery.schedules import crontab
@@ -33,13 +35,35 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
+ENVIRONMENT = os.getenv("DJANGO_ENV", "production")
+
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-2xp*qt(pgt-4lu7grfw#!*#z*u63jgp-uyl5kfuftpmp23-u@s'
+SECRET_KEY = os.getenv(
+    "DJANGO_SECRET_KEY",
+    "lbt!9cvq7g6e2l@#5!f8cbl12uwvud1p=w*1b9#0gi3q!t$z6o",
+)
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.getenv("DJANGO_DEBUG", "False").lower() == "true"
+# Auto-enable debug conveniences when using the built-in runserver locally
+if "runserver" in sys.argv and os.getenv("DJANGO_DEBUG") is None:
+    DEBUG = True
 
-ALLOWED_HOSTS = ["127.0.0.1", "localhost", "testserver"]
+ALLOWED_HOSTS = os.getenv("DJANGO_ALLOWED_HOSTS", "127.0.0.1,localhost,testserver").split(",")
+
+# Security hardening (HTTPS + cookies)
+_default_ssl_redirect = not DEBUG
+SECURE_SSL_REDIRECT = os.getenv(
+    "DJANGO_SECURE_SSL_REDIRECT", str(_default_ssl_redirect)
+).lower() == "true"
+SECURE_HSTS_SECONDS = int(
+    os.getenv("DJANGO_SECURE_HSTS_SECONDS", "31536000" if not DEBUG else "0")
+)
+SECURE_HSTS_INCLUDE_SUBDOMAINS = not DEBUG
+SECURE_HSTS_PRELOAD = not DEBUG
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+SESSION_COOKIE_SECURE = os.getenv("DJANGO_SESSION_COOKIE_SECURE", "True" if not DEBUG else "False").lower() == "true"
+CSRF_COOKIE_SECURE = os.getenv("DJANGO_CSRF_COOKIE_SECURE", "True" if not DEBUG else "False").lower() == "true"
 
 
 # Application definition
@@ -137,6 +161,7 @@ EMAIL_PORT = 587
 EMAIL_USE_TLS = True
 EMAIL_HOST_USER = 'iothrdwarelab@gmail.com'
 EMAIL_HOST_PASSWORD = 'Ioth@rdwar3'
+DEFAULT_FROM_EMAIL = os.getenv("DJANGO_FROM_EMAIL", "labtrack@localhost")
 LOGIN_REDIRECT_URL = '/'
 LOGOUT_REDIRECT_URL = '/accounts/login/'
 

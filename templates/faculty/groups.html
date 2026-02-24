@@ -1,8 +1,14 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-3">
-    <h3 class="mb-0">Groups Awaiting Approval</h3>
-</div>
+<section class="glass-panel p-4 mb-4">
+    <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
+        <div>
+            <div class="hero-eyebrow mb-1">Faculty Desk</div>
+            <h3 class="mb-0 fw-bold">Groups Awaiting Approval</h3>
+            <p class="text-muted mb-0">Review group details and approve in a click.</p>
+        </div>
+    </div>
+</section>
 
 <div class="glass-panel p-3">
     <div class="accordion" id="groupAccordion">
@@ -10,19 +16,28 @@
         <div class="accordion-item bg-transparent">
             <h2 class="accordion-header" id="heading{{ g.id }}">
                 <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ g.id }}">
-                    {{ g.code }} — {{ g.name|default:"No name" }} ({{ g.members.count }} members) — {{ g.status }}
+                    {{ g.code }} — {{ g.name|default:"No name" }} ({{ g.members.count }} members)
+                    <span class="ms-2 status-chip text-uppercase">{{ g.status }}</span>
                 </button>
             </h2>
             <div id="collapse{{ g.id }}" class="accordion-collapse collapse" data-bs-parent="#groupAccordion">
                 <div class="accordion-body">
-                    <p class="mb-2"><strong>Faculty:</strong> {% if g.faculty %}{{ g.faculty.username }}{% else %}—{% endif %}</p>
-                    <p class="mb-2"><strong>Status:</strong> {{ g.status }}</p>
-                    <p class="fw-semibold mt-3">Members</p>
+                    <div class="d-flex flex-wrap gap-3 mb-3">
+                        <div>
+                            <div class="text-muted small">Faculty</div>
+                            <div class="fw-semibold">{% if g.faculty %}{{ g.faculty.username }}{% else %}—{% endif %}</div>
+                        </div>
+                        <div>
+                            <div class="text-muted small">Status</div>
+                            <div class="status-chip text-uppercase">{{ g.status }}</div>
+                        </div>
+                    </div>
+                    <p class="fw-semibold mt-2 mb-1">Members</p>
                     <ul class="mb-3">
                         {% for m in g.members.all %}
                         <li>{{ m.user.username }} ({{ m.role }})</li>
                         {% empty %}
-                        <li>No members</li>
+                        <li class="text-muted">No members</li>
                         {% endfor %}
                     </ul>
                     {% if g.status == 'PENDING' %}

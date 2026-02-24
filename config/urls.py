@@ -10,4 +10,5 @@ urlpatterns = [
     path('', dashboard_redirect, name='dashboard'),
     path('inventory/', include('inventory.urls')),
     path('requests/', include('requests_app.urls')),
+    path('notifications/', include('notifications.urls')),
 ]

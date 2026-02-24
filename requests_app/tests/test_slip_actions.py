@@ -1,0 +1,94 @@
+from django.contrib.auth.models import User
+from django.test import TestCase, override_settings
+from django.utils import timezone
+from django.urls import reverse
+
+from inventory.models import Component
+from requests_app.models import BorrowRequest, BorrowRequestItem
+from users.models import Profile
+
+
+def make_user(username: str, role: str) -> User:
+    user = User.objects.create_user(username=username, password="pass")
+    profile = user.profile
+    profile.role = role
+    profile.save(update_fields=["role"])
+    return user
+
+
+@override_settings(EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend")
+class SlipActionTests(TestCase):
+    def setUp(self):
+        self.admin = make_user("admin", Profile.ROLE_ADMIN)
+        self.faculty = make_user("faculty", Profile.ROLE_FACULTY)
+        self.student = make_user("student", Profile.ROLE_STUDENT)
+
+        self.component = Component.objects.create(
+            name="Oscilloscope", category="Lab Gear", total_stock=10, available_stock=5
+        )
+
+    def _make_slip(self, status=BorrowRequest.STATUS_PENDING, faculty=None, quantity=2):
+        slip = BorrowRequest.objects.create(
+            student=self.student,
+            faculty=faculty,
+            counsellor="Advisor",
+        )
+        slip.status = status
+        slip.save(update_fields=["status"])
+        BorrowRequestItem.objects.create(request=slip, component=self.component, quantity=quantity)
+        return slip
+
+    def test_faculty_cannot_approve_other_faculty_slip(self):
+        other_faculty = make_user("other", Profile.ROLE_FACULTY)
+        slip = self._make_slip(faculty=other_faculty)
+        self.client.login(username="faculty", password="pass")
+
+        response = self.client.post(reverse("approve_slip", args=[slip.id]), secure=True)
+
+        slip.refresh_from_db()
+        self.assertEqual(slip.status, BorrowRequest.STATUS_PENDING)
+        self.assertRedirects(response, reverse("dashboard"), fetch_redirect_response=False)
+
+    def test_admin_approves_pending_slip(self):
+        slip = self._make_slip(faculty=self.faculty)
+        self.client.login(username="admin", password="pass")
+
+        response = self.client.post(reverse("approve_slip", args=[slip.id]), secure=True)
+
+        slip.refresh_from_db()
+        self.assertEqual(slip.status, BorrowRequest.STATUS_APPROVED)
+        self.assertRedirects(response, reverse("admin_dashboard"), fetch_redirect_response=False)
+
+    def test_mark_returned_restores_stock(self):
+        slip = self._make_slip(status=BorrowRequest.STATUS_APPROVED, faculty=self.faculty, quantity=3)
+        self.component.available_stock = 2
+        self.component.save(update_fields=["available_stock"])
+        self.client.login(username="admin", password="pass")
+
+        before = timezone.now()
+        response = self.client.post(
+            reverse("mark_returned", args=[slip.id]), {"condition": "Good"}, secure=True
+        )
+
+        self.component.refresh_from_db()
+        slip.refresh_from_db()
+        self.assertEqual(slip.status, BorrowRequest.STATUS_RETURNED)
+        self.assertEqual(self.component.available_stock, 5)
+        self.assertEqual(slip.return_condition, "Good")
+        self.assertIsNotNone(slip.return_time)
+        self.assertGreaterEqual(slip.return_time, before)
+        self.assertRedirects(response, reverse("admin_dashboard"), fetch_redirect_response=False)
+
+    def test_terminate_pending_slip_restores_stock(self):
+        slip = self._make_slip(status=BorrowRequest.STATUS_PENDING, faculty=self.faculty, quantity=4)
+        self.component.available_stock = 3
+        self.component.save(update_fields=["available_stock"])
+        self.client.login(username="admin", password="pass")
+
+        response = self.client.post(reverse("terminate_slip", args=[slip.id]), secure=True)
+
+        self.component.refresh_from_db()
+        slip.refresh_from_db()
+        self.assertEqual(slip.status, BorrowRequest.STATUS_TERMINATED)
+        self.assertEqual(self.component.available_stock, 7)
+        self.assertRedirects(response, reverse("admin_dashboard"), fetch_redirect_response=False)

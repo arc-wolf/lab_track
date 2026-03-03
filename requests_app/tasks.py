@@ -15,7 +15,7 @@ def send_due_reminders():
     now = timezone.now().date()
     target_date = now + timedelta(days=5)  # 40th day -> 5 days before 45-day due
     qs = BorrowRequest.objects.filter(
-        status=BorrowRequest.STATUS_APPROVED,
+        status__in=[BorrowRequest.STATUS_APPROVED, BorrowRequest.STATUS_ISSUED],
         reminder_sent=False,
         due_date__isnull=False,
         due_date__gte=target_date,
@@ -23,9 +23,9 @@ def send_due_reminders():
     )
 
     for req in qs:
-        recipients = [req.student.email]
-        if req.faculty and req.faculty.email:
-            recipients.append(req.faculty.email)
+        recipients = []
+        if req.user.email:
+            recipients.append(req.user.email)
         subject = "LabTrack return reminder"
         body = (
             f"Your borrow request #{req.id} is due on {req.due_date}. "
@@ -38,3 +38,22 @@ def send_due_reminders():
             req.reminder_sent = True
             req.save(update_fields=["reminder_sent"])
     return f"Processed {qs.count()} reminders"
+
+
+@shared_task
+def update_overdue_requests():
+    """
+    Move approved/issued requests to overdue once due date passes.
+    """
+    qs = BorrowRequest.objects.filter(
+        status__in=[BorrowRequest.STATUS_APPROVED, BorrowRequest.STATUS_ISSUED],
+        due_date__isnull=False,
+    )
+    updated = 0
+    for req in qs:
+        before = req.status
+        req.auto_mark_overdue()
+        req.refresh_from_db(fields=["status"])
+        if before != req.status and req.status == BorrowRequest.STATUS_OVERDUE:
+            updated += 1
+    return f"Marked {updated} requests as overdue"

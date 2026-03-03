@@ -171,6 +171,12 @@
             max-width: 65%;
             margin: 0 auto;
         }
+        @media (max-width: 992px) {
+            .signup-shell { max-width: 88%; }
+        }
+        @media (max-width: 576px) {
+            .signup-shell { max-width: 100%; }
+        }
         .card {
             border: none;
             border-radius: 18px;
@@ -313,10 +319,19 @@
 
 <div class="container page-shell py-4">
     {% if messages %}
-    <div class="mb-3">
+    <div class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 1100;">
         {% for message in messages %}
-        <div class="alert alert-{{ message.tags }} mb-2" role="alert">
-            {{ message }}
+        <div
+            class="toast align-items-center border-0 mb-2 {% if 'error' in message.tags %}text-bg-danger{% elif 'warning' in message.tags %}text-bg-warning{% elif 'success' in message.tags %}text-bg-success{% else %}text-bg-info{% endif %}"
+            role="alert"
+            aria-live="assertive"
+            aria-atomic="true"
+            data-bs-autohide="true"
+            data-bs-delay="{% if 'error' in message.tags %}6000{% elif 'warning' in message.tags %}5000{% else %}3500{% endif %}">
+            <div class="d-flex">
+                <div class="toast-body">{{ message }}</div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+            </div>
         </div>
         {% endfor %}
     </div>
@@ -348,6 +363,14 @@
         toggle?.addEventListener('click', () => {
             const next = root.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
             setTheme(next);
+        });
+    })();
+</script>
+<script>
+    (() => {
+        document.querySelectorAll('.toast').forEach((el) => {
+            const toast = new bootstrap.Toast(el);
+            toast.show();
         });
     })();
 </script>

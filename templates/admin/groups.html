@@ -42,10 +42,16 @@
                     </ul>
                     <div class="d-flex gap-2">
                         {% if g.status != 'APPROVED' %}
-                        <a href="{% url 'admin_group_approve' g.id %}" class="btn btn-success btn-sm">Approve</a>
+                        <form method="post" action="{% url 'admin_group_approve' g.id %}">
+                            {% csrf_token %}
+                            <button class="btn btn-success btn-sm">Approve</button>
+                        </form>
                         {% endif %}
                         {% if g.status != 'REJECTED' %}
-                        <a href="{% url 'admin_group_reject' g.id %}" class="btn btn-danger btn-sm">Reject</a>
+                        <form method="post" action="{% url 'admin_group_reject' g.id %}">
+                            {% csrf_token %}
+                            <button class="btn btn-danger btn-sm">Reject</button>
+                        </form>
                         {% endif %}
                     </div>
                 </div>

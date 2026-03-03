@@ -42,8 +42,14 @@
                     </ul>
                     {% if g.status == 'PENDING' %}
                     <div class="d-flex gap-2">
-                        <a href="{% url 'group_approve' g.id %}" class="btn btn-success btn-sm">Approve</a>
-                        <a href="{% url 'group_reject' g.id %}" class="btn btn-danger btn-sm">Reject</a>
+                        <form method="post" action="{% url 'group_approve' g.id %}">
+                            {% csrf_token %}
+                            <button class="btn btn-success btn-sm">Approve</button>
+                        </form>
+                        <form method="post" action="{% url 'group_reject' g.id %}">
+                            {% csrf_token %}
+                            <button class="btn btn-danger btn-sm">Reject</button>
+                        </form>
                     </div>
                     {% else %}
                     <span class="text-muted small">Processed</span>

@@ -1,66 +1,257 @@
 {% extends 'base.html' %}
 {% block content %}
 
-<section class="glass-panel p-4 mb-4">
+<section class="glass-panel p-4 mb-4 position-relative overflow-hidden">
     <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
         <div>
             <div class="hero-eyebrow mb-1">Faculty Desk</div>
             <h3 class="mb-1 fw-bold">Student Requests Under You</h3>
-            <p class="text-muted mb-0">Approve or download slips; see due dates at a glance.</p>
+            <p class="text-muted mb-0">Approve slips, track due dates, and keep teams moving.</p>
         </div>
         <div class="d-flex gap-2 flex-wrap">
-            <a href="{% url 'student_dashboard' %}" class="btn btn-primary">Request Components</a>
             <a href="{% url 'faculty_groups' %}" class="btn btn-secondary">Approve Groups</a>
+            <a href="{% url 'faculty_profile_console' %}" class="btn btn-outline-secondary">My Profile</a>
+            <a href="{% url 'student_dashboard' %}" class="btn btn-primary">Browse Components</a>
         </div>
     </div>
 </section>
 
+<div class="row g-3 mb-4">
+    <div class="col-md-3">
+        <div class="card h-100">
+            <div class="card-body">
+                <p class="text-muted mb-2">Active Requests</p>
+                <div class="d-flex align-items-center gap-3">
+                    <span class="glow-dot"></span>
+                    <div>
+                        <div class="stat-number fs-2">{{ total_active }}</div>
+                        <small class="text-muted">Pending + Approved</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card h-100">
+            <div class="card-body">
+                <p class="text-muted mb-2">Awaiting Return</p>
+                <div class="stat-number fs-2">{{ awaiting_return }}</div>
+                <small class="text-muted">Approved, not yet returned</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card h-100">
+            <div class="card-body">
+                <p class="text-muted mb-2">Returned</p>
+                <div class="stat-number fs-4">{{ stats.returned|default:0 }}</div>
+                <small class="text-muted">Closed with condition</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card h-100">
+            <div class="card-body">
+                <p class="text-muted mb-2">Rejected</p>
+                <div class="stat-number fs-4">{{ stats.rejected|default:0 }}</div>
+                <small class="text-muted">Declined or withdrawn</small>
+            </div>
+        </div>
+    </div>
+</div>
+
 <div class="glass-panel p-3">
-    {% if slips %}
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-3">
+        <div>
+            <div class="hero-eyebrow">Borrow Queue</div>
+            <h5 class="mb-0">Requests You Oversee</h5>
+        </div>
+        <div class="d-flex gap-2 align-items-center flex-wrap">
+            <span class="status-chip">{{ page_obj.paginator.count }} total</span>
+        </div>
+    </div>
+
+    <form method="get" class="row g-2 mb-3">
+        <div class="col-md-3">
+            <label class="form-label small text-muted">Search</label>
+            <div class="input-group">
+                <span class="input-group-text bg-transparent text-muted"><i class="bi bi-search"></i></span>
+                <input type="text" name="q" value="{{ search_query }}" class="form-control" placeholder="Slip #, student, or group">
+            </div>
+        </div>
+        <div class="col-md-3">
+            <label class="form-label small text-muted">Status</label>
+            <select name="status" class="form-select">
+                <option value="">All</option>
+                <option value="PENDING" {% if status_filter == 'PENDING' %}selected{% endif %}>Pending</option>
+                <option value="APPROVED" {% if status_filter == 'APPROVED' %}selected{% endif %}>Approved</option>
+                <option value="ISSUED" {% if status_filter == 'ISSUED' %}selected{% endif %}>Collected</option>
+                <option value="OVERDUE" {% if status_filter == 'OVERDUE' %}selected{% endif %}>Overdue</option>
+                <option value="PENALTY" {% if status_filter == 'PENALTY' %}selected{% endif %}>Penalty</option>
+                <option value="RETURNED" {% if status_filter == 'RETURNED' %}selected{% endif %}>Returned</option>
+                <option value="REJECTED" {% if status_filter == 'REJECTED' %}selected{% endif %}>Rejected</option>
+            </select>
+        </div>
+        <div class="col-md-3">
+            <label class="form-label small text-muted">Sort By</label>
+            <select name="sort" class="form-select">
+                <option value="created_desc" {% if sort_key == 'created_desc' %}selected{% endif %}>Newest first</option>
+                <option value="created_asc" {% if sort_key == 'created_asc' %}selected{% endif %}>Oldest first</option>
+                <option value="due_asc" {% if sort_key == 'due_asc' %}selected{% endif %}>Due date ↑</option>
+                <option value="due_desc" {% if sort_key == 'due_desc' %}selected{% endif %}>Due date ↓</option>
+                <option value="status" {% if sort_key == 'status' %}selected{% endif %}>Status</option>
+                <option value="student" {% if sort_key == 'student' %}selected{% endif %}>Student</option>
+                <option value="group" {% if sort_key == 'group' %}selected{% endif %}>Group</option>
+            </select>
+        </div>
+        <div class="col-md-2">
+            <label class="form-label small text-muted">Page Size</label>
+            <select name="page_size" class="form-select">
+                {% for size in page_sizes %}
+                <option value="{{ size }}" {% if page_size == size %}selected{% endif %}>{{ size }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-1 d-flex align-items-end">
+            <button class="btn btn-primary w-100" type="submit">Apply</button>
+        </div>
+    </form>
+
     <div class="table-responsive neo-table">
         <table class="table align-middle mb-0 table-hover">
             <thead>
                 <tr>
                     <th>Slip</th>
                     <th>Student</th>
-                    <th>Created</th>
+                    <th>Group</th>
                     <th>Status</th>
                     <th>Items</th>
                     <th>Due</th>
                     <th>Actions</th>
-                    <th>PDF</th>
+                    <th></th>
                 </tr>
             </thead>
             <tbody>
-                {% for slip in slips %}
+                {% for slip in page_obj.object_list %}
                 <tr>
                     <td class="fw-semibold">#{{ slip.id }}</td>
-                    <td>{{ slip.student.username }}</td>
-                    <td>{{ slip.created_at|date:"M j, Y" }}</td>
-                    <td><span class="status-chip text-uppercase">{{ slip.status }}</span></td>
+                    <td>{{ slip.user.username }}</td>
+                    <td>
+                        {% if slip.group %}
+                            {{ slip.group.code }}{% if slip.group.name %} • {{ slip.group.name }}{% endif %}
+                        {% else %}
+                            —
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if slip.status == 'PENDING' %}
+                            <span class="badge bg-warning text-dark">Pending</span>
+                        {% elif slip.status == 'APPROVED' %}
+                            <span class="badge bg-info text-dark">Approved</span>
+                        {% elif slip.status == 'ISSUED' %}
+                            <span class="badge bg-primary">Collected</span>
+                        {% elif slip.status == 'PENALTY' %}
+                            <span class="badge bg-dark">Penalty</span>
+                        {% elif slip.status == 'OVERDUE' %}
+                            <span class="badge bg-danger">Overdue</span>
+                        {% elif slip.status == 'RETURNED' %}
+                            <span class="badge bg-success">Returned</span>
+                        {% else %}
+                            <span class="badge bg-secondary">Rejected</span>
+                        {% endif %}
+                    </td>
                     <td class="small">
                         {% for item in slip.items.all %}
                             <span class="badge bg-secondary text-uppercase mb-1">{{ item.component.name }} ({{ item.quantity }})</span><br>
                         {% endfor %}
                     </td>
-                    <td>{{ slip.due_date|default:"—" }}</td>
+                    <td>{{ slip.due_date|date:"M j, Y"|default:"—" }}</td>
                     <td>
                         {% if slip.status == 'PENDING' %}
                         <form method="post" action="{% url 'approve_slip' slip.id %}">
                             {% csrf_token %}<button class="btn btn-success btn-sm">Approve</button>
                         </form>
                         {% else %}
-                        <span class="text-muted small">Processed</span>
+                        <a href="{% url 'download_slip' slip.id %}" class="btn btn-outline-primary btn-sm">PDF</a>
                         {% endif %}
                     </td>
-                    <td><a href="{% url 'download_slip' slip.id %}" class="btn btn-sm btn-outline-primary">PDF</a></td>
+                    <td>
+                        <button class="btn btn-outline-secondary btn-sm" data-bs-toggle="collapse" data-bs-target="#details-{{ slip.id }}">Details</button>
+                    </td>
                 </tr>
+                <tr class="collapse" id="details-{{ slip.id }}">
+                    <td colspan="8" class="bg-transparent">
+                        <div class="frosted p-3 rounded-3">
+                            <div class="d-flex flex-wrap justify-content-between gap-3">
+                                <div>
+                                    <div class="text-muted small">Faculty</div>
+                                    <div class="fw-semibold">
+                                        {% if slip.faculty %}
+                                            {{ slip.faculty.profile.full_name|default:slip.faculty.get_full_name|default:slip.faculty.username }}
+                                        {% else %}—{% endif %}
+                                    </div>
+                                </div>
+                                <div>
+                                    <div class="text-muted small">Project Title</div>
+                                    <div class="fw-semibold">{{ slip.project_title|default:slip.counsellor_name|default:"—" }}</div>
+                                </div>
+                                <div>
+                                    <div class="text-muted small">Created</div>
+                                    <div class="fw-semibold">{{ slip.created_at|date:"M j, Y — h:i A" }}</div>
+                                </div>
+                                <div>
+                                    <div class="text-muted small">Status</div>
+                                    <div class="status-chip text-uppercase">{{ slip.status }}</div>
+                                </div>
+                                <div>
+                                    <div class="text-muted small">Return Condition</div>
+                                    <div class="fw-semibold">{{ slip.return_condition|default:"—" }}</div>
+                                </div>
+                                <div>
+                                    <div class="text-muted small">Returned At</div>
+                                    <div class="fw-semibold">{{ slip.return_time|date:"M j, Y — h:i A"|default:"—" }}</div>
+                                </div>
+                            </div>
+                            <hr class="my-3">
+                            <div class="d-flex flex-wrap gap-2 align-items-center">
+                                <a href="{% url 'download_slip' slip.id %}" class="btn btn-sm btn-outline-primary">Download PDF</a>
+                                <span class="text-muted small">Items:</span>
+                                {% for item in slip.items.all %}
+                                    <span class="badge bg-secondary text-uppercase">{{ item.component.name }} ({{ item.quantity }})</span>
+                                {% endfor %}
+                            </div>
+                            <hr class="my-3">
+                            <div class="small text-muted mb-1">Action History</div>
+                            <ul class="mb-0 ps-3 small">
+                                {% for action in slip.actions.all %}
+                                <li>{{ action.timestamp|date:"M j, Y — h:i A" }} • {{ action.action }}{% if action.performed_by %} by {{ action.performed_by.username }}{% endif %}{% if action.note %} — {{ action.note }}{% endif %}</li>
+                                {% empty %}
+                                <li>No actions logged yet.</li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="8">No matching borrow requests.</td></tr>
                 {% endfor %}
             </tbody>
         </table>
     </div>
-    {% else %}
-        <div class="text-center py-4">No active requests.</div>
+
+    {% if page_obj.paginator.num_pages > 1 %}
+    <nav class="d-flex justify-content-between align-items-center mt-3">
+        <div class="small text-muted">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</div>
+        <ul class="pagination mb-0">
+            <li class="page-item {% if not page_obj.has_previous %}disabled{% endif %}">
+                <a class="page-link" href="?{% if querystring_base %}{{ querystring_base }}&{% endif %}page={{ page_obj.previous_page_number }}">Prev</a>
+            </li>
+            <li class="page-item disabled"><span class="page-link">{{ page_obj.number }}</span></li>
+            <li class="page-item {% if not page_obj.has_next %}disabled{% endif %}">
+                <a class="page-link" href="?{% if querystring_base %}{{ querystring_base }}&{% endif %}page={{ page_obj.next_page_number }}">Next</a>
+            </li>
+        </ul>
+    </nav>
     {% endif %}
 </div>
 

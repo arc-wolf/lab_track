@@ -12,15 +12,31 @@
 </section>
 
 <div class="glass-panel p-3 mb-3">
-    <form class="d-flex flex-wrap gap-2 align-items-center" method="GET">
-        <span class="text-uppercase text-muted small">Filter by type</span>
-        <select name="category" class="form-select w-auto" onchange="this.form.submit()">
-            <option value="">All</option>
-            {% for cat in categories %}
-            <option value="{{ cat }}" {% if selected_category == cat %}selected{% endif %}>{{ cat }}</option>
-            {% endfor %}
-        </select>
-        <button class="btn btn-secondary btn-sm" type="submit">Apply</button>
+    <form class="row g-2 align-items-end" method="GET">
+        <div class="col-md-4">
+            <label class="form-label small text-muted">Search Component</label>
+            <input type="text" name="q" value="{{ search_query }}" class="form-control" placeholder="Name contains...">
+        </div>
+        <div class="col-md-3">
+            <label class="form-label small text-muted">Category</label>
+            <select name="category" class="form-select">
+                <option value="">All</option>
+                {% for cat in categories %}
+                <option value="{{ cat }}" {% if selected_category == cat %}selected{% endif %}>{{ cat }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-3">
+            <label class="form-label small text-muted">Stock State</label>
+            <select name="stock" class="form-select">
+                <option value="">All</option>
+                <option value="low" {% if stock_filter == 'low' %}selected{% endif %}>Low Stock (<=2)</option>
+                <option value="out" {% if stock_filter == 'out' %}selected{% endif %}>Out of Stock</option>
+            </select>
+        </div>
+        <div class="col-md-2 d-flex gap-2">
+            <button class="btn btn-secondary w-100" type="submit">Apply</button>
+        </div>
     </form>
 </div>
 

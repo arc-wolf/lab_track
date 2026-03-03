@@ -1,0 +1,386 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<section class="glass-panel p-4 mb-4 position-relative overflow-hidden">
+    <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
+        <div>
+            <div class="hero-eyebrow mb-1">Data Console</div>
+            <h2 class="mb-1 fw-bold">Utilization & Penalties</h2>
+            <p class="text-muted mb-0">Analytics scaffold for component usage, group behaviour, and fines.</p>
+        </div>
+        <a href="{% url 'admin_dashboard' %}" class="btn btn-outline-secondary">Back to Admin Dashboard</a>
+    </div>
+</section>
+
+<style>
+    .chart-shell {
+        position: relative;
+        width: 100%;
+        min-height: 320px;
+        max-height: 360px;
+    }
+    .chart-shell.donut {
+        min-height: 260px;
+        max-height: 320px;
+    }
+    @media (max-width: 768px) {
+        .chart-shell {
+            min-height: 280px;
+            max-height: 320px;
+        }
+        .chart-shell.donut {
+            min-height: 240px;
+            max-height: 280px;
+        }
+    }
+</style>
+
+<div class="glass-panel p-3 mb-4">
+    <form method="get" class="row g-2 align-items-end">
+        <div class="col-md-6">
+            <label class="form-label small text-muted">Search Component</label>
+            <input class="form-control" name="component_q" value="{{ component_query }}" placeholder="Type component name...">
+        </div>
+        <div class="col-md-4">
+            <label class="form-label small text-muted">Sort Components</label>
+            <select class="form-select" name="component_sort">
+                <option value="name" {% if component_sort == 'name' %}selected{% endif %}>Name</option>
+                <option value="utilization" {% if component_sort == 'utilization' %}selected{% endif %}>Utilization %</option>
+                <option value="penalty" {% if component_sort == 'penalty' %}selected{% endif %}>Penalty Count</option>
+                <option value="damage" {% if component_sort == 'damage' %}selected{% endif %}>Damage Count</option>
+                <option value="available" {% if component_sort == 'available' %}selected{% endif %}>Available Stock</option>
+                <option value="risk" {% if component_sort == 'risk' %}selected{% endif %}>Risk Score</option>
+            </select>
+        </div>
+        <div class="col-md-2 d-flex gap-2">
+            <button class="btn btn-primary w-100" type="submit">Apply</button>
+        </div>
+    </form>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-md-2">
+        <div class="card h-100">
+            <div class="card-body">
+                <p class="text-muted small mb-1">Total Requests</p>
+                <div class="stat-number fs-3">{{ stats.total|default:0 }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="card h-100">
+            <div class="card-body">
+                <p class="text-muted small mb-1">Issued</p>
+                <div class="stat-number fs-4">{{ stats.issued|default:0 }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="card h-100">
+            <div class="card-body">
+                <p class="text-muted small mb-1">Penalty</p>
+                <div class="stat-number fs-4">{{ stats.penalty|default:0 }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="card h-100">
+            <div class="card-body">
+                <p class="text-muted small mb-1">Returned</p>
+                <div class="stat-number fs-4">{{ stats.returned|default:0 }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="card h-100">
+            <div class="card-body">
+                <p class="text-muted small mb-1">Overdue</p>
+                <div class="stat-number fs-4 text-danger">{{ stats.overdue|default:0 }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="card h-100">
+            <div class="card-body">
+                <p class="text-muted small mb-1">Active</p>
+                <div class="stat-number fs-4">{{ active_requests|default:0 }}</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-md-3">
+        <div class="glass-panel p-3 h-100">
+            <p class="text-muted small mb-1">Return Rate</p>
+            <div class="stat-number fs-3">{{ return_rate }}%</div>
+            <small class="text-muted">Returned / Total Requests</small>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="glass-panel p-3 h-100">
+            <p class="text-muted small mb-1">Penalty Rate</p>
+            <div class="stat-number fs-3 {% if penalty_rate >= 20 %}text-danger{% elif penalty_rate >= 10 %}text-warning{% endif %}">{{ penalty_rate }}%</div>
+            <small class="text-muted">Penalty / Total Requests</small>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="glass-panel p-3 h-100">
+            <p class="text-muted small mb-1">Stock Utilization</p>
+            <div class="stat-number fs-3">{{ utilization_rate }}%</div>
+            <small class="text-muted">Locked or issued vs total stock</small>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="glass-panel p-3 h-100">
+            <p class="text-muted small mb-1">Risky Returns</p>
+            <div class="stat-number fs-3 {% if risky_returns_count > 0 %}text-warning{% endif %}">{{ risky_returns_count }}</div>
+            <small class="text-muted">Damaged/missing/not-working flagged</small>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-lg-7">
+        <div class="glass-panel p-4 h-100">
+            <div class="hero-eyebrow">Analytics Charts</div>
+            <h5 class="mb-3">Collection vs Return vs Penalty</h5>
+            <div class="chart-shell">
+                <canvas id="componentBars"></canvas>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-5">
+        <div class="glass-panel p-4 mb-3">
+            <div class="hero-eyebrow">Status Distribution</div>
+            <h5 class="mb-2">Request lifecycle mix</h5>
+            <div class="chart-shell donut">
+                <canvas id="statusDonut"></canvas>
+            </div>
+        </div>
+        <div class="glass-panel p-4">
+            <div class="hero-eyebrow">AI Insight Engine</div>
+            <h5 class="mb-2">Operational Suggestions</h5>
+            <ul class="small mb-0 ps-3">
+                {% for tip in ai_insights %}
+                <li class="mb-2">{{ tip }}</li>
+                {% empty %}
+                <li>No insight available.</li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+</div>
+
+<div class="glass-panel p-4 mb-4">
+    <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+        <div>
+            <div class="hero-eyebrow">Component Movement Matrix</div>
+            <h5 class="mb-0">Stock and borrower analytics per component</h5>
+        </div>
+    </div>
+    <div class="table-responsive neo-table">
+        <table class="table table-hover align-middle mb-0">
+            <thead>
+                <tr>
+                    <th>Component</th>
+                    <th>Total</th>
+                    <th>Available</th>
+                    <th>Student Collected</th>
+                    <th>Faculty Collected</th>
+                    <th>Returned</th>
+                    <th>Penalized</th>
+                    <th>Damaged</th>
+                    <th>Utilization %</th>
+                    <th>Return %</th>
+                    <th>Risk</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in component_rows %}
+                <tr>
+                    <td>{{ row.name }}</td>
+                    <td>{{ row.total_stock }}</td>
+                    <td>{{ row.available_stock }}</td>
+                    <td>{{ row.students_collected }}</td>
+                    <td>{{ row.faculty_collected }}</td>
+                    <td>{{ row.total_returned }}</td>
+                    <td>{{ row.penalized }}</td>
+                    <td>{{ row.damaged }}</td>
+                    <td>{{ row.utilization_pct }}</td>
+                    <td>{{ row.return_rate_pct }}</td>
+                    <td>
+                        <span class="badge {% if row.risk_score >= 6 %}bg-danger{% elif row.risk_score >= 3 %}bg-warning text-dark{% else %}bg-success{% endif %}">
+                            {{ row.risk_score }}
+                        </span>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="11">No component analytics yet.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="glass-panel p-4 mb-4">
+    <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+        <div>
+            <div class="hero-eyebrow">High Risk Components</div>
+            <h5 class="mb-0">Immediate attention list</h5>
+        </div>
+    </div>
+    <div class="table-responsive neo-table">
+        <table class="table table-hover align-middle mb-0">
+            <thead>
+                <tr>
+                    <th>Component</th>
+                    <th>Available</th>
+                    <th>Penalized</th>
+                    <th>Damaged</th>
+                    <th>Risk Score</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in high_risk_components %}
+                <tr>
+                    <td>{{ row.name }}</td>
+                    <td>{{ row.available_stock }}</td>
+                    <td>{{ row.penalized }}</td>
+                    <td>{{ row.damaged }}</td>
+                    <td><span class="badge bg-danger">{{ row.risk_score }}</span></td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="5">No high-risk components right now.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="glass-panel p-4">
+    <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+        <div>
+            <div class="hero-eyebrow">Return Quality Log</div>
+            <h5 class="mb-0">Damaged/critical returns with returner details</h5>
+        </div>
+        <span class="status-chip">Recent 20</span>
+    </div>
+    <div class="table-responsive neo-table">
+        <table class="table table-hover align-middle">
+            <thead>
+                <tr>
+                    <th>Component</th>
+                    <th>Returner</th>
+                    <th>Role</th>
+                    <th>Condition</th>
+                    <th>Qty</th>
+                    <th>Returned At</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in returned_details %}
+                <tr>
+                    <td>{{ item.component }}</td>
+                    <td>{{ item.returner }}</td>
+                    <td class="text-uppercase">{{ item.role }}</td>
+                    <td>{{ item.condition }}</td>
+                    <td>{{ item.quantity }}</td>
+                    <td>{{ item.returned_at|date:"M j, Y — h:i A"|default:"—" }}</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="6">No damaged/critical returns logged yet.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <p class="text-muted small mt-2 mb-0">This dashboard is auto-derived from request lifecycle and return condition logs.</p>
+</div>
+
+{{ chart_labels|json_script:"chart-labels" }}
+{{ chart_collected|json_script:"chart-collected" }}
+{{ chart_returned|json_script:"chart-returned" }}
+{{ chart_penalized|json_script:"chart-penalized" }}
+{{ status_labels|json_script:"status-labels" }}
+{{ status_values|json_script:"status-values" }}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+(() => {
+    const labels = JSON.parse(document.getElementById("chart-labels").textContent || "[]");
+    const collected = JSON.parse(document.getElementById("chart-collected").textContent || "[]");
+    const returned = JSON.parse(document.getElementById("chart-returned").textContent || "[]");
+    const penalized = JSON.parse(document.getElementById("chart-penalized").textContent || "[]");
+    const statusLabels = JSON.parse(document.getElementById("status-labels").textContent || "[]");
+    const statusValues = JSON.parse(document.getElementById("status-values").textContent || "[]");
+    const el = document.getElementById("componentBars");
+    const donutEl = document.getElementById("statusDonut");
+    if (el && labels.length) {
+        new Chart(el, {
+            type: "bar",
+            data: {
+                labels,
+                datasets: [
+                    { label: "Collected", data: collected, backgroundColor: "rgba(33, 150, 243, 0.65)" },
+                    { label: "Returned", data: returned, backgroundColor: "rgba(76, 175, 80, 0.65)" },
+                    { label: "Penalized", data: penalized, backgroundColor: "rgba(244, 67, 54, 0.65)" },
+                ],
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: { mode: "index", intersect: false },
+                plugins: {
+                    legend: { position: "top" },
+                    tooltip: { padding: 10 }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: { precision: 0, maxTicksLimit: 8 },
+                        grid: { color: "rgba(255,255,255,0.08)" }
+                    },
+                    x: {
+                        ticks: { maxRotation: 45, minRotation: 20, autoSkip: true, maxTicksLimit: 12 },
+                        grid: { color: "rgba(255,255,255,0.06)" }
+                    }
+                },
+            },
+        });
+    }
+
+    if (donutEl && statusLabels.length) {
+        new Chart(donutEl, {
+            type: "doughnut",
+            data: {
+                labels: statusLabels,
+                datasets: [
+                    {
+                        data: statusValues,
+                        backgroundColor: [
+                            "rgba(255, 193, 7, 0.75)",
+                            "rgba(13, 202, 240, 0.75)",
+                            "rgba(13, 110, 253, 0.75)",
+                            "rgba(25, 135, 84, 0.75)",
+                            "rgba(220, 53, 69, 0.75)",
+                            "rgba(111, 66, 193, 0.75)",
+                            "rgba(108, 117, 125, 0.75)",
+                        ],
+                        borderWidth: 1,
+                    },
+                ],
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                cutout: "62%",
+                plugins: {
+                    legend: { position: "bottom", labels: { boxWidth: 14, padding: 12 } },
+                    tooltip: { padding: 10 }
+                },
+            },
+        });
+    }
+})();
+</script>
+
+{% endblock %}

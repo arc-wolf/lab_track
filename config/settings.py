@@ -15,14 +15,19 @@ import sys
 from pathlib import Path
 
 from celery.schedules import crontab
+from dotenv import load_dotenv
 
 CELERY_BEAT_SCHEDULE = {
     'cleanup-expired-cart-every-10-minutes': {
-        'task': 'inventory.tasks.cleanup_expired_cart_items',
+        'task': 'inventory.tasks.cleanup_expired_reservations',
         'schedule': 600.0,  # every 10 minutes
     },
     'request-due-reminders-daily': {
         'task': 'requests_app.tasks.send_due_reminders',
+        'schedule': 86400.0,  # daily
+    },
+    'request-overdue-status-daily': {
+        'task': 'requests_app.tasks.update_overdue_requests',
         'schedule': 86400.0,  # daily
     },
 }
@@ -30,6 +35,7 @@ CELERY_BEAT_SCHEDULE = {
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+load_dotenv(BASE_DIR / ".env")
 
 
 # Quick-start development settings - unsuitable for production
@@ -79,6 +85,7 @@ INSTALLED_APPS = [
     'inventory',
     'requests_app',
     'notifications',
+    'api',
 ]
 
 
@@ -155,12 +162,12 @@ USE_I18N = True
 
 USE_TZ = True
 
-EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-EMAIL_HOST = 'smtp.gmail.com'
-EMAIL_PORT = 587
-EMAIL_USE_TLS = True
-EMAIL_HOST_USER = 'iothrdwarelab@gmail.com'
-EMAIL_HOST_PASSWORD = 'Ioth@rdwar3'
+EMAIL_BACKEND = os.getenv("DJANGO_EMAIL_BACKEND", "django.core.mail.backends.smtp.EmailBackend")
+EMAIL_HOST = os.getenv("DJANGO_EMAIL_HOST", "smtp.gmail.com")
+EMAIL_PORT = int(os.getenv("DJANGO_EMAIL_PORT", "587"))
+EMAIL_USE_TLS = os.getenv("DJANGO_EMAIL_USE_TLS", "True").lower() == "true"
+EMAIL_HOST_USER = os.getenv("DJANGO_EMAIL_HOST_USER", "")
+EMAIL_HOST_PASSWORD = os.getenv("DJANGO_EMAIL_HOST_PASSWORD", "")
 DEFAULT_FROM_EMAIL = os.getenv("DJANGO_FROM_EMAIL", "labtrack@localhost")
 LOGIN_REDIRECT_URL = '/'
 LOGOUT_REDIRECT_URL = '/accounts/login/'

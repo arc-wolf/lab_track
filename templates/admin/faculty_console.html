@@ -1,0 +1,95 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<section class="glass-panel p-4 mb-4 position-relative overflow-hidden">
+    <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
+        <div>
+            <div class="hero-eyebrow mb-1">Faculty Console</div>
+            <h2 class="mb-1 fw-bold">Components & Stock</h2>
+            <p class="text-muted mb-0">Admin tools to view component stock, allocations, and new requests.</p>
+        </div>
+        <div class="d-flex gap-2 flex-wrap">
+            <a href="{% url 'admin_dashboard' %}" class="btn btn-outline-secondary">Back to Admin Dashboard</a>
+            <a href="{% url 'admin_components' %}" class="btn btn-primary">Open Inventory</a>
+        </div>
+    </div>
+</section>
+
+<div class="glass-panel p-4 mb-4">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+        <div>
+            <div class="hero-eyebrow">Stock Shortcuts</div>
+            <h5 class="mb-0">Jump to common tasks</h5>
+        </div>
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+        <a class="status-chip" href="{% url 'admin_components' %}">Browse inventory</a>
+        <a class="status-chip" href="{% url 'admin_component_create' %}">Add new component</a>
+        <a class="status-chip" href="{% url 'admin_components' %}?stock=low">Low-stock items</a>
+        <a class="status-chip" href="{% url 'admin_maintenance_queue' %}">Maintenance queue</a>
+        <a class="status-chip" href="{% url 'admin_reports_console' %}">Reports console</a>
+    </div>
+</div>
+
+<div class="row g-3">
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <div>
+                        <p class="text-muted small mb-0">Components</p>
+                        <h5 class="mb-0">Inventory Console</h5>
+                    </div>
+                    <a href="{% url 'admin_components' %}" class="btn btn-outline-primary btn-sm">Open</a>
+                </div>
+                <p class="text-muted small mb-2">Review stock ledger, edit quantities, and manage categories.</p>
+                <ul class="small text-muted ps-3 mb-0">
+                    <li>Adjust stock on hand and available</li>
+                    <li>Track recent transactions</li>
+                    <li>View component detail pages</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <div>
+                        <p class="text-muted small mb-0">Requests</p>
+                        <h5 class="mb-0">Faculty Request Inbox</h5>
+                    </div>
+                    <span class="badge bg-info text-dark">Live</span>
+                </div>
+                {% if faculty_requests %}
+                <div class="table-responsive neo-table">
+                    <table class="table table-sm align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th>Slip</th>
+                                <th>Requester</th>
+                                <th>Status</th>
+                                <th>Created</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for req in faculty_requests %}
+                            <tr>
+                                <td>#{{ req.id }}</td>
+                                <td>{{ req.user.username }}</td>
+                                <td><span class="status-chip">{{ req.status }}</span></td>
+                                <td>{{ req.created_at|date:"M j, Y" }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <p class="text-muted small mb-0">No faculty-originated requests yet.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

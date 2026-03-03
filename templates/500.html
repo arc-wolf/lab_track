@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Server Error | LabTrack</title>
+    <style>
+        :root {
+            --bg1: #111827;
+            --bg2: #312e81;
+            --card: rgba(255, 255, 255, 0.1);
+            --text: #f8fafc;
+            --muted: #d1d5db;
+            --accent: #f6c343;
+            --danger: #ef4444;
+        }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            min-height: 100vh;
+            display: grid;
+            place-items: center;
+            font-family: "Segoe UI", Tahoma, sans-serif;
+            color: var(--text);
+            background:
+                radial-gradient(900px 500px at 0% 0%, rgba(239, 68, 68, 0.22), transparent),
+                radial-gradient(900px 500px at 100% 0%, rgba(246, 195, 67, 0.22), transparent),
+                linear-gradient(130deg, var(--bg1), var(--bg2));
+            padding: 24px;
+        }
+        .card {
+            width: min(760px, 100%);
+            background: var(--card);
+            border: 1px solid rgba(255, 255, 255, 0.25);
+            border-radius: 20px;
+            backdrop-filter: blur(10px);
+            padding: 28px;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.35);
+        }
+        .code { font-size: 80px; font-weight: 800; line-height: 1; margin: 0; color: var(--danger); }
+        h1 { margin: 6px 0 10px; font-size: 30px; }
+        p { margin: 8px 0; color: var(--muted); }
+        .notice {
+            margin-top: 12px;
+            padding: 10px 12px;
+            border-radius: 10px;
+            background: rgba(0, 0, 0, 0.25);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: #fde68a;
+            font-size: 14px;
+        }
+        .actions { margin-top: 18px; display: flex; gap: 10px; flex-wrap: wrap; }
+        .btn {
+            display: inline-block;
+            text-decoration: none;
+            color: #111827;
+            background: var(--accent);
+            padding: 10px 14px;
+            border-radius: 10px;
+            font-weight: 600;
+        }
+        .btn.secondary { background: #e2e8f0; }
+    </style>
+</head>
+<body>
+    <main class="card">
+        <p class="code">500</p>
+        <h1>Something went wrong on our side.</h1>
+        <p>The app hit an unexpected error while processing your request.</p>
+        <div class="notice">Tip: refresh once. If it continues, contact lab admin with what action triggered this page.</div>
+        <div class="actions">
+            <a href="/" class="btn">Go to dashboard</a>
+            <a href="javascript:location.reload()" class="btn secondary">Try again</a>
+        </div>
+    </main>
+</body>
+</html>

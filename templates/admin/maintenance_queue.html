@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="glass-panel p-4 mb-4">
+    <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
+        <div>
+            <div class="hero-eyebrow mb-1">Maintenance Queue</div>
+            <h3 class="mb-1 fw-bold">Service and Risk Monitoring</h3>
+            <p class="text-muted mb-0">Items are listed based on return condition keywords and stock risk.</p>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="{% url 'admin_component_console' %}" class="btn btn-outline-primary">Policy Parameters</a>
+            <a href="{% url 'admin_dashboard' %}" class="btn btn-outline-secondary">Back</a>
+        </div>
+    </div>
+</section>
+
+<div class="glass-panel p-4 mb-3">
+    <div class="small text-muted mb-1">Active maintenance keywords</div>
+    <div class="status-chip">{{ policy.maintenance_keywords }}</div>
+</div>
+
+<div class="row g-3">
+    <div class="col-lg-6">
+        <div class="glass-panel p-3 h-100">
+            <h6 class="mb-2">Condition-triggered maintenance</h6>
+            <div class="table-responsive neo-table">
+                <table class="table table-sm align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>Component</th>
+                            <th>Slip</th>
+                            <th>Returner</th>
+                            <th>Condition</th>
+                            <th>Returned</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in maintenance_items %}
+                        <tr>
+                            <td>{{ item.component.name }}</td>
+                            <td>#{{ item.borrow_request.id }}</td>
+                            <td>{{ item.borrow_request.user.username }}</td>
+                            <td>{{ item.borrow_request.return_condition|default:"—" }}</td>
+                            <td>{{ item.borrow_request.return_time|date:"M j, Y" }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="5">No maintenance-triggered returns.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-6">
+        <div class="glass-panel p-3 h-100 mb-3">
+            <h6 class="mb-2">Low stock (<=2)</h6>
+            <div class="table-responsive neo-table">
+                <table class="table table-sm align-middle mb-0">
+                    <thead><tr><th>Component</th><th>Available</th><th>Total</th></tr></thead>
+                    <tbody>
+                        {% for c in low_stock %}
+                        <tr>
+                            <td>{{ c.name }}</td>
+                            <td>{{ c.available_stock }}</td>
+                            <td>{{ c.total_stock }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="3">No low-stock components.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <div class="glass-panel p-3 h-100">
+            <h6 class="mb-2">Penalty-stage requests</h6>
+            <div class="table-responsive neo-table">
+                <table class="table table-sm align-middle mb-0">
+                    <thead><tr><th>Slip</th><th>Requester</th><th>Faculty</th><th>Status</th></tr></thead>
+                    <tbody>
+                        {% for req in penalty_reqs %}
+                        <tr>
+                            <td>#{{ req.id }}</td>
+                            <td>{{ req.user.username }}</td>
+                            <td>{{ req.faculty.username|default:"—" }}</td>
+                            <td>{{ req.status }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="4">No penalty-stage requests.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+

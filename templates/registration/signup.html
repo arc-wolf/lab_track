@@ -7,30 +7,57 @@
         <p class="text-center text-muted mb-4 small">Use your official Amrita email to auto-classify as Student or Faculty/Staff.</p>
 
         {% if form.errors %}
-        <div class="alert alert-warning">
-            <strong>Fix the issues below:</strong>
+        <div class="alert alert-danger">
+            <strong>Signup failed. Fix the issues below:</strong>
             <ul class="mb-0">
                 {% for field, errs in form.errors.items %}
                     {% for err in errs %}
-                    <li>{{ field|capfirst }}: {{ err }}</li>
+                    <li>{% if field == '__all__' %}Form{% else %}{{ field|capfirst }}{% endif %}: {{ err }}</li>
                     {% endfor %}
                 {% endfor %}
             </ul>
+            <hr class="my-2">
+            <small>
+                Use <code>@am.students.amrita.edu</code> for students or <code>@am.amrita.edu</code> for faculty/staff.
+            </small>
         </div>
         {% endif %}
+        {% if otp_stage %}
+        <div class="alert alert-info">
+            OTP sent to <strong>{{ pending_email }}</strong>. Enter the 6-digit code to finish registration.
+        </div>
+        <form method="post" id="signup-otp-form">
+            {% csrf_token %}
+            <input type="hidden" name="otp_stage" value="1">
+            <div class="mb-3">
+                <label class="form-label">{{ otp_form.otp.label }}</label>
+                {{ otp_form.otp }}
+                {{ otp_form.otp.errors }}
+            </div>
+            <button class="btn btn-primary w-100 mt-2">Verify OTP & Create Account</button>
+        </form>
+        <div class="text-center mt-3">
+            <a href="{% url 'resend_signup_otp' %}" class="small">Resend OTP</a>
+        </div>
+        {% else %}
         <form method="post" id="signup-form">
             {% csrf_token %}
-            {{ form.non_field_errors }}
-            <div class="mb-3">
-                <label class="form-label">Username</label>
-                {{ form.username }}
-                {{ form.username.errors }}
+            {% if form.non_field_errors %}
+            <div class="alert alert-warning py-2 small">
+                {{ form.non_field_errors }}
             </div>
+            {% endif %}
+            {{ form.username }}
             <div class="mb-3">
                 <label class="form-label">Organization Email</label>
                 {{ form.email }}
                 <small id="domain-hint" class="text-danger d-none">Use your official Amrita email (@am.amrita.edu or @am.students.amrita.edu).</small>
                 {{ form.email.errors }}
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Full Name</label>
+                {{ form.full_name }}
+                {{ form.full_name.errors }}
             </div>
             <div class="mb-3">
                 <label class="form-label">Phone</label>
@@ -53,6 +80,32 @@
             <!-- micro front-end style split -->
             <div id="student-section" class="mt-4 d-none">
                 <p class="fw-bold text-warning mb-2">Section B: Student Details</p>
+                <div class="mb-3">
+                    <label class="form-label">Group Option</label>
+                    <div class="d-flex gap-3">
+                        <label class="form-check">
+                            <input
+                                type="radio"
+                                class="form-check-input"
+                                name="group_mode"
+                                value="create"
+                                {% if form.group_mode.value|default:'create' == 'create' %}checked{% endif %}
+                            >
+                            <span class="ms-1">Create new group (generates code)</span>
+                        </label>
+                        <label class="form-check">
+                            <input
+                                type="radio"
+                                class="form-check-input"
+                                name="group_mode"
+                                value="join"
+                                {% if form.group_mode.value == 'join' %}checked{% endif %}
+                            >
+                            <span class="ms-1">Join existing group</span>
+                        </label>
+                    </div>
+                    {{ form.group_mode.errors }}
+                </div>
                 <div class="row g-3">
                     <div class="col-md-4">
                         <label class="form-label">Semester</label>
@@ -64,37 +117,36 @@
                         {{ form.student_class }}
                         {{ form.student_class.errors }}
                     </div>
-                    <div class="col-md-4">
-                        <label class="form-label">Group ID</label>
-                        {{ form.group_id }}
-                        {{ form.group_id.errors }}
-                    </div>
-                    <div class="col-md-6">
+                    <div class="col-md-4 create-group-only">
                         <label class="form-label">Group Name</label>
                         {{ form.group_name }}
                         {{ form.group_name.errors }}
                     </div>
-                    <div class="col-md-12">
+                    <div class="col-md-4 join-only">
+                        <label class="form-label">Group Code to Join</label>
+                        {{ form.join_group_code }}
+                        {{ form.join_group_code.errors }}
+                    </div>
+                    <div class="col-md-6">
                         <label class="form-label">Faculty Incharge</label>
                         {{ form.faculty_incharge }}
+                        <small class="text-muted d-block mt-1">
+                            Required when creating a group. For joining a group, keep this aligned with the group faculty.
+                        </small>
                         {{ form.faculty_incharge.errors }}
                     </div>
                 </div>
+                {{ form.group_id }} {# hidden, set during save #}
             </div>
 
             <div id="faculty-section" class="mt-4 d-none">
                 <p class="fw-bold text-info mb-2">Section B: Faculty/Staff Details</p>
-                <div class="row g-3">
-                    <div class="col-md-6">
-                        <label class="form-label">Full Name</label>
-                        {{ form.full_name }}
-                        {{ form.full_name.errors }}
-                    </div>
-                </div>
+                <p class="small text-muted mb-0">Faculty account detected from email domain. Continue to submit.</p>
             </div>
 
             <button class="btn btn-primary w-100 mt-4">Sign Up</button>
         </form>
+        {% endif %}
         </div>
     </div>
 </div>
@@ -105,6 +157,13 @@
         const studentSection = document.getElementById('student-section');
         const facultySection = document.getElementById('faculty-section');
         const domainHint = document.getElementById('domain-hint');
+        const groupModeInputs = document.querySelectorAll('input[name="group_mode"]');
+        const createGroupOnly = document.querySelectorAll('.create-group-only');
+        const joinOnly = document.querySelectorAll('.join-only');
+
+        if (!emailInput || !studentSection || !facultySection || !domainHint) {
+            return;
+        }
 
         function classify() {
             const email = (emailInput.value || '').toLowerCase();
@@ -114,6 +173,7 @@
                 domainHint.classList.add('d-none');
                 setRequired(studentSection, true);
                 setRequired(facultySection, false);
+                toggleGroupMode();
             } else if (email.endsWith('@am.amrita.edu')) {
                 facultySection.classList.remove('d-none');
                 studentSection.classList.add('d-none');
@@ -131,6 +191,9 @@
 
         function setRequired(container, state) {
             container.querySelectorAll('input, select').forEach(el => {
+                if (['group_mode', 'group_id', 'group_name', 'join_group_code', 'faculty_incharge'].includes(el.name)) {
+                    return;
+                }
                 if (state) {
                     el.setAttribute('required', 'required');
                 } else {
@@ -139,8 +202,35 @@
             });
         }
 
+        function toggleGroupMode() {
+            const studentVisible = !studentSection.classList.contains('d-none');
+            const facultySelect = document.querySelector('select[name="faculty_incharge"]');
+
+            if (!studentVisible) {
+                createGroupOnly.forEach(el => el.querySelectorAll('input').forEach(inp => inp.removeAttribute('required')));
+                joinOnly.forEach(el => el.querySelectorAll('input').forEach(inp => inp.removeAttribute('required')));
+                if (facultySelect) {
+                    facultySelect.removeAttribute('required');
+                }
+                return;
+            }
+
+            const mode = document.querySelector('input[name="group_mode"]:checked')?.value || 'create';
+            createGroupOnly.forEach(el => el.classList.toggle('d-none', mode !== 'create'));
+            joinOnly.forEach(el => el.classList.toggle('d-none', mode !== 'join'));
+            // required toggles
+            createGroupOnly.forEach(el => el.querySelectorAll('input').forEach(inp => mode === 'create' ? inp.setAttribute('required','required') : inp.removeAttribute('required')));
+            joinOnly.forEach(el => el.querySelectorAll('input').forEach(inp => mode === 'join' ? inp.setAttribute('required','required') : inp.removeAttribute('required')));
+            if (facultySelect) {
+                if (mode === 'create') facultySelect.setAttribute('required', 'required');
+                else facultySelect.removeAttribute('required');
+            }
+        }
+
         emailInput?.addEventListener('input', classify);
+        groupModeInputs.forEach(r => r.addEventListener('change', toggleGroupMode));
         classify();
+        toggleGroupMode();
     })();
 </script>
 {% endblock %}

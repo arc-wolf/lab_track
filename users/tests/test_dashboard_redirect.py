@@ -3,6 +3,7 @@ from django.urls import reverse
 from django.contrib.auth.models import User
 
 from users.models import Profile
+from users.models import Group
 
 
 def make_user(username: str, role: str) -> User:
@@ -37,3 +38,14 @@ class DashboardRedirectTests(TestCase):
         response = self.client.get(reverse("dashboard"), secure=True)
 
         self.assertRedirects(response, reverse("student_dashboard"), fetch_redirect_response=False)
+
+    def test_group_approve_requires_post(self):
+        faculty = make_user("faculty2", Profile.ROLE_FACULTY)
+        group = Group.objects.create(code="POST01", faculty=faculty, status=Group.STATUS_PENDING)
+        self.client.login(username="faculty2", password="pass")
+
+        response = self.client.get(reverse("group_approve", args=[group.id]), secure=True)
+
+        self.assertEqual(response.status_code, 405)
+        group.refresh_from_db()
+        self.assertEqual(group.status, Group.STATUS_PENDING)

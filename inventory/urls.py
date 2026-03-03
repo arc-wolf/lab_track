@@ -6,7 +6,7 @@ urlpatterns = [
     path("components/", views.student_dashboard, name="student_dashboard"),
     path("cart/", views.view_cart, name="view_cart"),
     path("cart/add/<int:component_id>/", views.add_to_cart, name="add_to_cart"),
-    path("cart/remove/<int:item_id>/", views.remove_cart_item, name="remove_cart_item"),
+    path("cart/remove/<int:reservation_id>/", views.remove_cart_item, name="remove_cart_item"),
     path("cart/generate/", views.generate_slip, name="generate_slip"),
     path("requests/", views.student_requests, name="student_requests"),
     # Admin inventory management

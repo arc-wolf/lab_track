@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Page Not Found | LabTrack</title>
+    <style>
+        :root {
+            --bg1: #0b1320;
+            --bg2: #1c2541;
+            --card: rgba(255, 255, 255, 0.1);
+            --text: #f8fafc;
+            --muted: #cbd5e1;
+            --accent: #f6c343;
+            --danger: #ef4444;
+        }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            min-height: 100vh;
+            display: grid;
+            place-items: center;
+            font-family: "Segoe UI", Tahoma, sans-serif;
+            color: var(--text);
+            background:
+                radial-gradient(1000px 500px at 10% 10%, rgba(246, 195, 67, 0.25), transparent),
+                radial-gradient(900px 400px at 90% 0%, rgba(239, 68, 68, 0.20), transparent),
+                linear-gradient(135deg, var(--bg1), var(--bg2));
+            padding: 24px;
+        }
+        .card {
+            width: min(720px, 100%);
+            background: var(--card);
+            border: 1px solid rgba(255, 255, 255, 0.25);
+            border-radius: 20px;
+            backdrop-filter: blur(10px);
+            padding: 28px;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.35);
+        }
+        .code { font-size: 80px; font-weight: 800; line-height: 1; margin: 0; color: var(--accent); }
+        h1 { margin: 6px 0 10px; font-size: 30px; }
+        p { margin: 8px 0; color: var(--muted); }
+        .path {
+            margin-top: 10px;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+            font-size: 13px;
+            color: #fde68a;
+            background: rgba(0, 0, 0, 0.25);
+            padding: 8px 10px;
+            border-radius: 8px;
+            overflow-wrap: anywhere;
+        }
+        .actions { margin-top: 18px; display: flex; gap: 10px; flex-wrap: wrap; }
+        .btn {
+            display: inline-block;
+            text-decoration: none;
+            color: #111827;
+            background: var(--accent);
+            padding: 10px 14px;
+            border-radius: 10px;
+            font-weight: 600;
+        }
+        .btn.secondary { background: #e2e8f0; }
+        .dot { color: var(--danger); }
+    </style>
+</head>
+<body>
+    <main class="card">
+        <p class="code">404</p>
+        <h1>Page not found <span class="dot">.</span></h1>
+        <p>The link may be broken, moved, or deleted.</p>
+        {% if request_path %}
+        <div class="path">Requested path: {{ request_path }}</div>
+        {% endif %}
+        <div class="actions">
+            <a href="/" class="btn">Go to dashboard</a>
+            <a href="javascript:history.back()" class="btn secondary">Go back</a>
+        </div>
+    </main>
+</body>
+</html>

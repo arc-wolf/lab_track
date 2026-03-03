@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bad Request | LabTrack</title>
+    <style>
+        body {
+            margin: 0;
+            min-height: 100vh;
+            display: grid;
+            place-items: center;
+            font-family: "Segoe UI", Tahoma, sans-serif;
+            color: #f8fafc;
+            background: linear-gradient(140deg, #1f2937, #111827);
+            padding: 24px;
+        }
+        .card {
+            width: min(680px, 100%);
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 18px;
+            padding: 24px;
+            backdrop-filter: blur(8px);
+        }
+        h1 { margin: 0 0 8px; font-size: 30px; }
+        p { margin: 0 0 14px; color: #cbd5e1; }
+        .code { color: #f6c343; font-weight: 700; font-size: 56px; margin: 0; }
+        a {
+            display: inline-block;
+            margin-top: 8px;
+            padding: 10px 14px;
+            border-radius: 10px;
+            text-decoration: none;
+            color: #111827;
+            background: #f6c343;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+    <main class="card">
+        <p class="code">400</p>
+        <h1>Bad request</h1>
+        <p>Your request could not be processed. Try again from the app screen.</p>
+        <a href="/">Back to dashboard</a>
+    </main>
+</body>
+</html>

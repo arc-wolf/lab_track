@@ -4,34 +4,46 @@
 <section class="glass-panel p-4 mb-4">
     <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
         <div>
-            <div class="hero-eyebrow mb-1">Your Borrow Cart</div>
+            <div class="hero-eyebrow mb-1">{% if shared_mode %}Team Borrow Cart{% else %}Your Borrow Cart{% endif %}</div>
             <h3 class="mb-1 fw-bold">Finalize components before generating a slip</h3>
-            <p class="text-muted mb-0">Review items, choose faculty incharge, and add your counsellor.</p>
+            <p class="text-muted mb-0">
+                {% if shared_mode %}
+                Shared group cart. Any team member can add/remove and submit the request.
+                {% else %}
+                Review items, choose faculty incharge, and add your project title.
+                {% endif %}
+            </p>
         </div>
-        <div class="status-chip">{{ cart_items|length }} item{{ cart_items|length|pluralize }}</div>
+        <div class="status-chip">{{ reservations|length }} reservation{{ reservations|length|pluralize }}</div>
     </div>
 </section>
 
 <div class="glass-panel p-3 mb-4">
-    {% if cart_items %}
+    {% if reservations %}
     <div class="table-responsive neo-table">
         <table class="table align-middle mb-0 table-hover">
             <thead>
                 <tr>
                     <th>Component</th>
+                    {% if shared_mode %}<th>Added By</th>{% endif %}
                     <th class="text-center">Quantity</th>
                     <th class="text-end">Action</th>
                 </tr>
             </thead>
             <tbody>
-                {% for item in cart_items %}
+                {% for res in reservations %}
                 <tr>
-                    <td class="fw-semibold">{{ item.component.name }}</td>
+                    <td class="fw-semibold">{{ res.component.name }}</td>
+                    {% if shared_mode %}<td>{{ res.user.username }}</td>{% endif %}
                     <td class="text-center">
-                        <span class="badge bg-secondary">{{ item.quantity }}</span>
+                        <span class="badge bg-secondary">{{ res.quantity }}</span>
+                        <div class="small text-muted">Expires at {{ res.expires_at|date:"M j, Y — h:i A" }}</div>
                     </td>
                     <td class="text-end">
-                        <a href="{% url 'remove_cart_item' item.id %}" class="btn btn-outline-danger btn-sm">Remove</a>
+                        <form method="post" action="{% url 'remove_cart_item' res.id %}" class="d-inline">
+                            {% csrf_token %}
+                            <button class="btn btn-outline-danger btn-sm">Remove</button>
+                        </form>
                     </td>
                 </tr>
                 {% endfor %}
@@ -47,36 +59,58 @@
 </div>
 
 <div class="row g-3">
+    {% if not is_faculty_user %}
     <div class="col-md-6">
         <div class="glass-panel p-3 h-100">
             <h6 class="mb-2 text-muted">Faculty Incharge</h6>
             <p class="small text-muted mb-2">Select who will approve your slip.</p>
             <select name="faculty" form="generateSlipForm" class="form-select" required>
+                <option value="">Select faculty</option>
                 {% for faculty in faculties %}
-                <option value="{{ faculty.id }}">{{ faculty.user.username }}</option>
+                <option value="{{ faculty.id }}">{{ faculty.full_name|default:faculty.user.get_full_name|default:faculty.user.username }}</option>
                 {% endfor %}
             </select>
         </div>
     </div>
-    <div class="col-md-6">
+    {% endif %}
+    <div class="{% if is_faculty_user %}col-md-12{% else %}col-md-6{% endif %}">
         <div class="glass-panel p-3 h-100">
-            <h6 class="mb-2 text-muted">Counsellor</h6>
-            <p class="small text-muted mb-2">We need a counsellor name for record keeping.</p>
-            <input type="text" name="counsellor" form="generateSlipForm" class="form-control" placeholder="Enter counsellor name" required>
+            <h6 class="mb-2 text-muted">Project Title</h6>
+            <p class="small text-muted mb-2">Enter your project/work title for the slip record.</p>
+            <input type="text" name="project_title" form="generateSlipForm" class="form-control" placeholder="Enter project title" required>
         </div>
     </div>
 </div>
 
 <form id="generateSlipForm" class="mt-4" method="POST" action="{% url 'generate_slip' %}">
     {% csrf_token %}
-    <button class="btn btn-success w-100 py-3" {% if not cart_items %}disabled{% endif %}>
+    <button type="button" class="btn btn-success w-100 py-3" data-bs-toggle="modal" data-bs-target="#confirmModal" {% if not reservations %}disabled{% endif %}>
         Generate Borrow Slip
     </button>
 </form>
 
 <div class="d-flex justify-content-between align-items-center mt-3">
     <a href="{% url 'student_dashboard' %}" class="btn btn-link">Back to components</a>
-    <a href="{% url 'student_requests' %}" class="btn btn-outline-primary btn-sm">View Active Requests</a>
+    <a href="{% url 'student_requests' %}" class="btn btn-outline-primary btn-sm">View Requests</a>
+</div>
+
+<!-- confirmation modal -->
+<div class="modal fade" id="confirmModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header border-0">
+        <h5 class="modal-title">Generate slip?</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p class="mb-0">Submitting will lock these reservations into a borrow slip and notify approvers. Continue?</p>
+      </div>
+      <div class="modal-footer border-0">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="submit" form="generateSlipForm" class="btn btn-success">Confirm & Submit</button>
+      </div>
+    </div>
+  </div>
 </div>
 
 {% endblock %}

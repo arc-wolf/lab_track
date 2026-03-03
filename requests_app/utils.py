@@ -1,223 +1,247 @@
+from datetime import timedelta
 from io import BytesIO
-from datetime import datetime
 
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
-from reportlab.lib.units import mm
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+from reportlab.lib.units import inch
+from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 
+from .models import BorrowRequest
+from users.models import Group, GroupMember
 
-def build_request_pdf(borrow_request):
+
+def _build_styles():
+    styles = getSampleStyleSheet()
+    styles.add(
+        ParagraphStyle(
+            name="Header",
+            parent=styles["Heading2"],
+            fontName="Helvetica-Bold",
+            fontSize=14,
+            alignment=1,  # center
+            spaceAfter=2,
+        )
+    )
+    styles.add(
+        ParagraphStyle(
+            name="SubHeader",
+            parent=styles["Normal"],
+            fontName="Helvetica",
+            fontSize=11,
+            alignment=1,
+            spaceAfter=6,
+        )
+    )
+    styles.add(
+        ParagraphStyle(
+            name="Label",
+            parent=styles["Normal"],
+            fontName="Helvetica",
+            fontSize=10,
+            leading=12,
+        )
+    )
+    styles.add(
+        ParagraphStyle(
+            name="SmallRight",
+            parent=styles["Normal"],
+            fontName="Helvetica",
+            fontSize=9,
+            alignment=2,  # right
+        )
+    )
+    styles.add(
+        ParagraphStyle(
+            name="TableCell",
+            parent=styles["Normal"],
+            fontName="Helvetica",
+            fontSize=10,
+            leading=12,
+        )
+    )
+    styles.add(
+        ParagraphStyle(
+            name="SmallLabel",
+            parent=styles["Normal"],
+            fontName="Helvetica",
+            fontSize=9,
+            leading=11,
+        )
+    )
+    return styles
+
+
+def generate_borrow_slip_pdf(borrow_request_id):
     """
-    Build a print-ready A4 PDF for the lab request/issue form.
+    Build an institutional-style A4 Borrow Request Slip (Version A) using Platypus.
     Returns (filename, bytes).
     """
+    borrow_request = (
+        BorrowRequest.objects.select_related("user", "user__profile")
+        .prefetch_related("items__component")
+        .get(id=borrow_request_id)
+    )
+
+    # derive fields with safe fallbacks
+    profile = getattr(borrow_request.user, "profile", None)
+    group_no = getattr(profile, "group_id", "") or "________________"
+    project_title = (
+        getattr(borrow_request, "project_title", None)
+        or getattr(borrow_request, "counsellor_name", "")
+        or "____________________________________________"
+    )
+    department = getattr(profile, "student_class", "") or "________________"
+    batch = getattr(profile, "semester", "") or "________"
+    request_date = borrow_request.created_at.date()
+    due_date = borrow_request.due_date or (request_date + timedelta(days=45))
+
+    styles = _build_styles()
+
     buffer = BytesIO()
     doc = SimpleDocTemplate(
         buffer,
         pagesize=A4,
-        topMargin=25 * mm,
-        bottomMargin=15 * mm,
-        leftMargin=30 * mm,  # extra space for punching holes
-        rightMargin=20 * mm,
-    )
-
-    styles = getSampleStyleSheet()
-    styles.add(
-        ParagraphStyle(
-            name="TitleCenter",
-            parent=styles["Heading1"],
-            fontName="Times-Bold",
-            fontSize=18,
-            alignment=1,
-            spaceAfter=4,
-        )
-    )
-    styles.add(
-        ParagraphStyle(
-            name="SubtitleCenter",
-            parent=styles["Normal"],
-            fontName="Times-Roman",
-            fontSize=14,
-            alignment=1,
-            spaceAfter=10,
-        )
-    )
-    normal = ParagraphStyle(
-        "NormalSerif", parent=styles["Normal"], fontName="Times-Roman", fontSize=11, leading=14
+        leftMargin=1.2 * inch,
+        rightMargin=0.8 * inch,
+        topMargin=0.75 * inch,
+        bottomMargin=0.75 * inch,
     )
 
     elements = []
 
     # Header
-    elements.append(Paragraph("Hardware & IoT LAB", styles["TitleCenter"]))
-    elements.append(Paragraph("Equipment’s / Components Request & Issue Form", styles["SubtitleCenter"]))
+    elements.append(Paragraph("Hardware & IoT LAB", styles["Header"]))
+    elements.append(Paragraph("Equipment’s /Components request & Issue Form", styles["SubHeader"]))
 
-    # Group number top-right
-    elements.append(
-        Paragraph(
-            '<para align="right"><font size="10">Group No: ____________</font></para>',
-            normal,
-        )
-    )
+    # Right aligned meta
+    meta_lines = [
+        f"Request ID: {borrow_request.id}",
+        f"Status: {borrow_request.status}",
+    ]
+    elements.append(Paragraph("<br/>".join(meta_lines), styles["SmallRight"]))
     elements.append(Spacer(1, 6))
 
-    student_profile = getattr(borrow_request.student, "profile", None)
-    dept = getattr(student_profile, "student_class", "") or "___________________________"
-    batch = getattr(student_profile, "semester", "") or "____________"
-    project_title = getattr(borrow_request, "counsellor", "") or "_______________________________________________"
-    request_date = borrow_request.created_at.strftime("%Y-%m-%d")
+    # Details section
+    detail_lines = [
+        f"Group No: {group_no}",
+        f"Project/work Title : {project_title}",
+        f"Department : {department}    Batch: {batch}    Request Date: {request_date}",
+    ]
+    for line in detail_lines:
+        elements.append(Paragraph(line, styles["Label"]))
+        elements.append(Spacer(1, 4))
 
-    # Section 1: project details
-    elements.append(
-        Paragraph(
-            f"Project/work Title : {project_title}",
-            normal,
-        )
-    )
-    elements.append(Spacer(1, 8))
+    # Group members (name / reg / phone) fetched from DB
+    members_line = ""
+    if profile and profile.group_id:
+        group = Group.objects.filter(code=profile.group_id).first()
+        if group:
+            members = (
+                GroupMember.objects.filter(group=group)
+                .select_related("user__profile")
+                .order_by("role", "user__username")
+            )
+            member_bits = []
+            for gm in members[:8]:
+                p = getattr(gm.user, "profile", None)
+                name = getattr(p, "full_name", "") or gm.user.username
+                phone = getattr(p, "phone", "") or "—"
+                member_bits.append(f"{name} (Mob: {phone})")
+            if member_bits:
+                members_line = "Members: " + "; ".join(member_bits)
+    if members_line:
+        elements.append(Paragraph(members_line, styles["SmallLabel"]))
+        elements.append(Spacer(1, 6))
 
-    line2 = (
-        f"Department : {dept}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"
-        f"Batch : {batch}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"
-        f"Request Date : {request_date}"
-    )
-    elements.append(Paragraph(line2, normal))
-    elements.append(Spacer(1, 12))
+    elements.append(Spacer(1, 6))
 
-    # Section 2: main table
+    # ---------------- Table: fixed institutional layout ----------------
     headers = [
-        "Sl No",
-        "Equipment’s / Components",
-        "Qnty",
-        "Rec Date",
-        "Sign",
-        "Return Date",
-        "Staff Sign",
-        "Remarks",
+        Paragraph("Sl No", styles["TableCell"]),
+        Paragraph("Equipment / Component", styles["TableCell"]),
+        Paragraph("Qty", styles["TableCell"]),
+        Paragraph("Rec Date", styles["TableCell"]),
+        Paragraph("Sign", styles["TableCell"]),
+        Paragraph("Return Date", styles["TableCell"]),
+        Paragraph("Staff Sign", styles["TableCell"]),
+        Paragraph("Remarks", styles["TableCell"]),
     ]
 
-    # usable width after margins: 160mm (210 - 30 - 20). Apply percentages (wider date/sign cols to avoid clipping).
-    usable_mm = 160.0
-    col_widths = [
-        0.06 * usable_mm * mm,  # Sl No
-        0.28 * usable_mm * mm,  # Equipment
-        0.08 * usable_mm * mm,  # Qnty
-        0.12 * usable_mm * mm,  # Rec Date
-        0.10 * usable_mm * mm,  # Sign
-        0.14 * usable_mm * mm,  # Return Date
-        0.10 * usable_mm * mm,  # Staff Sign
-        0.12 * usable_mm * mm,  # Remarks
-    ]
-
-    data_rows_actual = []
+    item_rows = []
     for idx, item in enumerate(borrow_request.items.select_related("component"), start=1):
-        data_rows_actual.append(
+        item_rows.append(
             [
-                str(idx),
-                item.component.name,
-                str(item.quantity),
-                "",
-                "",
-                "",
-                "",
-                "",
+                Paragraph(str(idx), styles["TableCell"]),
+                Paragraph(item.component.name, styles["TableCell"]),
+                Paragraph(str(item.quantity), styles["TableCell"]),
+                Paragraph("", styles["TableCell"]),
+                Paragraph("", styles["TableCell"]),
+                Paragraph("", styles["TableCell"]),
+                Paragraph("", styles["TableCell"]),
+                Paragraph("", styles["TableCell"]),
             ]
         )
 
-    rows = list(data_rows_actual)
+    # pad to exactly 10 item rows
+    while len(item_rows) < 10:
+        item_rows.append([Paragraph("", styles["TableCell"]) for _ in headers])
 
-    # compute row budget to keep single-page layout
-    min_rows = 12
-    max_rows = 15  # tuned to keep to single page while filling area
-    row_height_mm = 11
-    data_rows = max(len(rows), min_rows)
-    data_rows = min(data_rows, max_rows)
+    data = [headers] + item_rows[:10]
 
-    # pad or trim to fit budget
-    if len(rows) < data_rows:
-        while len(rows) < data_rows:
-            rows.append([""] * len(headers))
-    elif len(rows) > data_rows:
-        rows = rows[: data_rows]
+    col_widths = [25, 150, 35, 50, 40, 50, 40, 60]
+    row_heights = [30] + [50] * 10  # header + 10 items ≈ 530 points to fit first page
 
     table = Table(
-        [headers] + rows,
+        data,
         colWidths=col_widths,
-        rowHeights=[row_height_mm * mm] + [row_height_mm * mm] * len(rows),
+        rowHeights=row_heights,
         repeatRows=1,
+        hAlign="LEFT",
     )
 
-    styles_table = [
-        ("FONTNAME", (0, 0), (-1, 0), "Times-Bold"),
-        ("FONTSIZE", (0, 0), (-1, 0), 11),
-        ("FONTSIZE", (0, 1), (-1, -1), 11),
-        ("FONTNAME", (0, 1), (-1, -1), "Times-Roman"),
-        ("ALIGN", (0, 0), (-1, 0), "CENTER"),
-        ("ALIGN", (1, 0), (1, 0), "LEFT"),
-        ("ALIGN", (0, 1), (0, -1), "CENTER"),
-        ("ALIGN", (2, 1), (2, -1), "CENTER"),
-        ("BOX", (0, 0), (-1, -1), 0.5, colors.black),
-        ("LINEBELOW", (0, 0), (-1, 0), 0.5, colors.black),  # separate header
-        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-        ("LEFTPADDING", (0, 0), (-1, -1), 4),
-        ("RIGHTPADDING", (0, 0), (-1, -1), 4),
-        ("TOPPADDING", (0, 0), (-1, -1), 4),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
-    ]
+    table_style = TableStyle(
+        [
+            ("BOX", (0, 0), (-1, -1), 1, colors.black),
+            ("BACKGROUND", (0, 0), (-1, 0), colors.whitesmoke),
+            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+            ("FONTSIZE", (0, 0), (-1, 0), 10),
+            ("FONTNAME", (0, 1), (-1, -1), "Helvetica"),
+            ("FONTSIZE", (0, 1), (-1, -1), 10),
+            ("ALIGN", (0, 0), (0, -1), "CENTER"),  # Sl No
+            ("ALIGN", (2, 0), (2, -1), "CENTER"),  # Qty
+            ("ALIGN", (3, 0), (6, -1), "CENTER"),  # dates/signs
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 4),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+        ]
+    )
 
-    # add vertical column lines only
-    num_cols = len(headers)
-    for c in range(1, num_cols):
-        styles_table.append(("LINEBEFORE", (c, 0), (c, len(rows)), 0.5, colors.black))
+    # Full vertical separators for all rows (header + data)
+    for col_idx in range(1, len(headers)):
+        table_style.add("LINEBEFORE", (col_idx, 0), (col_idx, len(data) - 1), 1, colors.black)
 
-    # add separators between actual data rows (not blank padding)
-    if len(data_rows_actual) > 1:
-        for r in range(1, len(data_rows_actual)):
-            styles_table.append(("LINEBELOW", (0, r), (-1, r), 0.5, colors.black))
-
-    table.setStyle(TableStyle(styles_table))
+    table.setStyle(table_style)
     elements.append(table)
-    elements.append(Spacer(1, 6 * mm))
+    elements.append(Spacer(1, 12))
 
     # Footer
-    staff_name = ""
-    if borrow_request.faculty:
-        staff_name = getattr(borrow_request.faculty.profile, "full_name", "") or borrow_request.faculty.username
-
-    footer_left = [
-        ["Staff in Charge Name : ______________________"],
-        ["Sign : ______________________"],
+    fac = getattr(borrow_request, "faculty", None)
+    staff_name = (
+        getattr(fac.profile, "full_name", "") if fac and hasattr(fac, "profile") else ""
+    ) or (fac.get_full_name() if fac else "") or (fac.username if fac else "") or getattr(profile, "faculty_incharge", "") or "___________________________"
+    footer_lines = [
+        f"Staff In Charge Name : {staff_name}",
+        "Sign : ___________________________",
     ]
-    footer_right = [
-        ["Write Group Members Name, Reg: no"],
-        ["& Mob number on other side"],
-    ]
-
-    footer_table = Table(
-        [
-            [Paragraph(footer_left[0][0], normal), Paragraph(footer_right[0][0], normal)],
-            [Paragraph(footer_left[1][0], normal), Paragraph(footer_right[1][0], normal)],
-        ],
-        colWidths=[85 * mm, 85 * mm],
-    )
-    footer_table.setStyle(
-        TableStyle(
-            [
-                ("ALIGN", (0, 0), (0, -1), "LEFT"),
-                ("ALIGN", (1, 0), (1, -1), "RIGHT"),
-                ("VALIGN", (0, 0), (-1, -1), "TOP"),
-                ("LEFTPADDING", (0, 0), (-1, -1), 0),
-                ("RIGHTPADDING", (0, 0), (-1, -1), 0),
-            ]
-        )
-    )
-    elements.append(footer_table)
+    elements.append(Paragraph(footer_lines[0], styles["Label"]))
+    elements.append(Spacer(1, 4))
+    elements.append(Paragraph(footer_lines[1], styles["Label"]))
+    elements.append(Spacer(1, 6))
 
     doc.build(elements)
     pdf_bytes = buffer.getvalue()
     buffer.close()
 
-    filename = f"borrow_slip_{borrow_request.id}.pdf"
+    filename = f"borrow_request_{borrow_request.id}.pdf"
     return filename, pdf_bytes

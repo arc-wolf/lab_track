@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="glass-panel p-4 mb-4">
+    <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
+        <div>
+            <div class="hero-eyebrow mb-1">Student Profile</div>
+            <h3 class="mb-1 fw-bold">My Profile Settings</h3>
+            <p class="text-muted mb-0">Update your personal and academic details.</p>
+        </div>
+        <a href="{% url 'student_dashboard' %}" class="btn btn-outline-secondary">Back to Dashboard</a>
+    </div>
+</section>
+
+<div class="glass-panel p-4">
+    <form method="post" class="row g-3">
+        {% csrf_token %}
+        <div class="col-md-6">
+            <label class="form-label">Username</label>
+            <input class="form-control" value="{{ request.user.username }}" disabled>
+        </div>
+        <div class="col-md-6">
+            <label class="form-label">Group ID</label>
+            <input class="form-control" value="{{ student_profile.group_id|default:'—' }}" disabled>
+        </div>
+        <div class="col-md-6">
+            <label class="form-label">Full Name</label>
+            <input class="form-control" name="full_name" value="{{ student_profile.full_name|default:'' }}">
+        </div>
+        <div class="col-md-6">
+            <label class="form-label">Phone</label>
+            <input class="form-control" name="phone" value="{{ student_profile.phone|default:'' }}">
+        </div>
+        <div class="col-md-6">
+            <label class="form-label">Semester</label>
+            <input class="form-control" name="semester" value="{{ student_profile.semester|default:'' }}">
+        </div>
+        <div class="col-md-6">
+            <label class="form-label">Class</label>
+            <input class="form-control" name="student_class" value="{{ student_profile.student_class|default:'' }}">
+        </div>
+        <div class="col-md-6">
+            <label class="form-label">Email</label>
+            <input type="email" class="form-control" name="email" value="{{ request.user.email|default:'' }}">
+        </div>
+        <div class="col-md-6">
+            <label class="form-label">New Password</label>
+            <input type="password" class="form-control" name="password" placeholder="Leave blank to keep current">
+        </div>
+        <div class="col-12">
+            <button class="btn btn-primary">Save Profile</button>
+        </div>
+    </form>
+</div>
+{% endblock %}
+

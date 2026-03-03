@@ -4,8 +4,8 @@
 <section class="glass-panel p-4 mb-4">
     <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
         <div>
-            <div class="hero-eyebrow mb-1">My Requests</div>
-            <h4 class="mb-1 fw-bold">Active Borrow Slips</h4>
+            <div class="hero-eyebrow mb-1">{% if shared_mode %}Team Requests{% else %}My Requests{% endif %}</div>
+            <h4 class="mb-1 fw-bold">{% if shared_mode %}Group Borrow Slips{% else %}Active Borrow Slips{% endif %}</h4>
             <p class="text-muted mb-0">Track approvals, due dates, and download PDFs.</p>
         </div>
         <a href="{% url 'student_dashboard' %}" class="btn btn-outline-primary btn-sm">Back to Components</a>
@@ -19,8 +19,9 @@
             <thead>
                 <tr>
                     <th>Slip</th>
+                    {% if shared_mode %}<th>Requester</th>{% endif %}
                     <th>Faculty</th>
-                    <th>Counsellor</th>
+                    <th>Project Title</th>
                     <th>Items</th>
                     <th>Created</th>
                     <th>Due</th>
@@ -32,8 +33,9 @@
                 {% for slip in slips %}
                 <tr>
                     <td class="fw-semibold">#{{ slip.id }}</td>
-                    <td>{% if slip.faculty %}{{ slip.faculty.username }}{% else %}—{% endif %}</td>
-                    <td>{{ slip.counsellor }}</td>
+                    {% if shared_mode %}<td>{{ slip.user.username }}</td>{% endif %}
+                    <td>{% if slip.faculty %}{{ slip.faculty.profile.full_name|default:slip.faculty.get_full_name|default:slip.faculty.username }}{% else %}—{% endif %}</td>
+                    <td>{{ slip.project_title|default:slip.counsellor_name|default:"—" }}</td>
                     <td class="small">
                         {% for item in slip.items.all %}
                             <span class="badge bg-secondary text-uppercase mb-1">{{ item.component.name }} ({{ item.quantity }})</span><br>

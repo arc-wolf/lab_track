@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="glass-panel p-4 mb-4">
+    <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
+        <div>
+            <div class="hero-eyebrow mb-1">Reports Console</div>
+            <h3 class="mb-1 fw-bold">Operational Summary</h3>
+            <p class="text-muted mb-0">Quick reporting panel for groups, requests, and borrower load.</p>
+        </div>
+        <a href="{% url 'admin_dashboard' %}" class="btn btn-outline-secondary">Back</a>
+    </div>
+</section>
+
+<div class="row g-3 mb-4">
+    <div class="col-md-2"><div class="card h-100"><div class="card-body"><p class="small text-muted mb-1">Total</p><div class="stat-number fs-4">{{ totals.total|default:0 }}</div></div></div></div>
+    <div class="col-md-2"><div class="card h-100"><div class="card-body"><p class="small text-muted mb-1">Active</p><div class="stat-number fs-4">{{ totals.active|default:0 }}</div></div></div></div>
+    <div class="col-md-2"><div class="card h-100"><div class="card-body"><p class="small text-muted mb-1">Overdue</p><div class="stat-number fs-4">{{ totals.overdue|default:0 }}</div></div></div></div>
+    <div class="col-md-2"><div class="card h-100"><div class="card-body"><p class="small text-muted mb-1">Penalty</p><div class="stat-number fs-4">{{ totals.penalty|default:0 }}</div></div></div></div>
+    <div class="col-md-2"><div class="card h-100"><div class="card-body"><p class="small text-muted mb-1">Returned</p><div class="stat-number fs-4">{{ totals.returned|default:0 }}</div></div></div></div>
+</div>
+
+<div class="row g-3">
+    <div class="col-lg-6">
+        <div class="glass-panel p-3 h-100">
+            <h6 class="mb-2">Requests by requester role</h6>
+            <div class="table-responsive neo-table">
+                <table class="table table-sm align-middle mb-0">
+                    <thead><tr><th>Role</th><th>Total Requests</th></tr></thead>
+                    <tbody>
+                        {% for row in role_split %}
+                        <tr>
+                            <td class="text-uppercase">{{ row.user__profile__role|default:"unknown" }}</td>
+                            <td>{{ row.total }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="2">No role split data.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-6">
+        <div class="glass-panel p-3 h-100">
+            <h6 class="mb-2">Top users by borrowed quantity</h6>
+            <div class="table-responsive neo-table">
+                <table class="table table-sm align-middle mb-0">
+                    <thead><tr><th>User</th><th>Total Qty</th></tr></thead>
+                    <tbody>
+                        {% for row in top_users %}
+                        <tr>
+                            <td>{{ row.borrow_request__user__username }}</td>
+                            <td>{{ row.total_qty }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="2">No user stats yet.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+

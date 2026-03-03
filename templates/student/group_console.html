@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="glass-panel p-4 mb-4">
+    <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
+        <div>
+            <div class="hero-eyebrow mb-1">Team Console</div>
+            <h3 class="mb-1 fw-bold">Group {{ group.code }} {% if group.name %}• {{ group.name }}{% endif %}</h3>
+            <p class="text-muted mb-0">
+                Members can view the team. Removal requires confirmation from both member and team leader.
+            </p>
+        </div>
+        <a href="{% url 'student_dashboard' %}" class="btn btn-outline-secondary">Back to Dashboard</a>
+    </div>
+</section>
+
+<div class="row g-3 mb-4">
+    <div class="col-md-4">
+        <div class="card h-100">
+            <div class="card-body">
+                <p class="text-muted mb-1">Group ID</p>
+                <div class="stat-number fs-4">{{ group.code }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card h-100">
+            <div class="card-body">
+                <p class="text-muted mb-1">Team Members</p>
+                <div class="stat-number fs-4">{{ members|length }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card h-100">
+            <div class="card-body">
+                <p class="text-muted mb-1">Your Role</p>
+                <div class="stat-number fs-5">{{ current_member.role }}</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="glass-panel p-3 mb-4">
+    <h5 class="mb-3">Team Members</h5>
+    <div class="table-responsive neo-table">
+        <table class="table table-hover align-middle mb-0">
+            <thead>
+                <tr>
+                    <th>Username</th>
+                    <th>Role</th>
+                    <th>Joined</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for m in members %}
+                <tr>
+                    <td>{{ m.user.username }}</td>
+                    <td>
+                        {% if m.role == 'LEADER' %}
+                        <span class="badge bg-primary">Team Leader</span>
+                        {% else %}
+                        <span class="badge bg-secondary">Member</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ m.joined_at|date:"M j, Y" }}</td>
+                    <td>
+                        {% if m.role == 'LEADER' %}
+                            <span class="text-muted small">Leader</span>
+                        {% elif m.user == request.user %}
+                            <form method="post" class="d-inline">
+                                {% csrf_token %}
+                                <input type="hidden" name="action" value="start_removal">
+                                <input type="hidden" name="member_id" value="{{ m.user.id }}">
+                                <button class="btn btn-sm btn-outline-danger">Request Self Removal</button>
+                            </form>
+                        {% elif is_leader %}
+                            <form method="post" class="d-inline">
+                                {% csrf_token %}
+                                <input type="hidden" name="action" value="start_removal">
+                                <input type="hidden" name="member_id" value="{{ m.user.id }}">
+                                <button class="btn btn-sm btn-outline-danger">Start Removal</button>
+                            </form>
+                        {% else %}
+                            <span class="text-muted small">Member-managed</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="glass-panel p-3">
+    <h5 class="mb-3">Pending Removal Requests</h5>
+    <div class="table-responsive neo-table">
+        <table class="table table-hover align-middle mb-0">
+            <thead>
+                <tr>
+                    <th>Member</th>
+                    <th>Initiated By</th>
+                    <th>Member Confirmed</th>
+                    <th>Leader Confirmed</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for req in pending_removals %}
+                <tr>
+                    <td>{{ req.member.username }}</td>
+                    <td>{{ req.initiated_by }}</td>
+                    <td>{% if req.member_confirmed %}Yes{% else %}No{% endif %}</td>
+                    <td>{% if req.leader_confirmed %}Yes{% else %}No{% endif %}</td>
+                    <td>
+                        <div class="d-flex gap-2 flex-wrap">
+                            {% if req.member == request.user and not req.member_confirmed %}
+                            <form method="post">
+                                {% csrf_token %}
+                                <input type="hidden" name="action" value="confirm_removal">
+                                <input type="hidden" name="request_id" value="{{ req.id }}">
+                                <button class="btn btn-sm btn-success">Member Confirm</button>
+                            </form>
+                            {% endif %}
+                            {% if is_leader and not req.leader_confirmed %}
+                            <form method="post">
+                                {% csrf_token %}
+                                <input type="hidden" name="action" value="confirm_removal">
+                                <input type="hidden" name="request_id" value="{{ req.id }}">
+                                <button class="btn btn-sm btn-primary">Leader Confirm</button>
+                            </form>
+                            {% endif %}
+                            {% if req.member == request.user or is_leader %}
+                            <form method="post">
+                                {% csrf_token %}
+                                <input type="hidden" name="action" value="cancel_removal">
+                                <input type="hidden" name="request_id" value="{{ req.id }}">
+                                <button class="btn btn-sm btn-outline-secondary">Cancel</button>
+                            </form>
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="5">No pending removal requests.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+

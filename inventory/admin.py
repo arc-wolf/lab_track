@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import CartItem, Component
+from .models import Component, Reservation
 
 
 @admin.register(Component)
@@ -9,7 +9,7 @@ class ComponentAdmin(admin.ModelAdmin):
     search_fields = ("name", "category")
 
 
-@admin.register(CartItem)
-class CartItemAdmin(admin.ModelAdmin):
-    list_display = ("student", "component", "quantity", "added_at", "slip_generated")
-    list_filter = ("slip_generated", "added_at")
+@admin.register(Reservation)
+class ReservationAdmin(admin.ModelAdmin):
+    list_display = ("user", "component", "quantity", "reserved_at", "expires_at", "is_active")
+    list_filter = ("is_active", "reserved_at")

@@ -2,6 +2,13 @@ from django.db import models
 from django.contrib.auth.models import User
 from django.db.models.signals import post_save
 from django.dispatch import receiver
+from django.utils import timezone
+from datetime import timedelta
+import secrets
+
+
+def generate_api_token_key() -> str:
+    return secrets.token_hex(32)
 
 
 class Profile(models.Model):
@@ -76,3 +83,94 @@ class GroupMember(models.Model):
 
     def __str__(self):
         return f"{self.user.username} -> {self.group.code}"
+
+
+class GroupRemovalRequest(models.Model):
+    STATUS_PENDING = "PENDING"
+    STATUS_APPROVED = "APPROVED"
+    STATUS_CANCELLED = "CANCELLED"
+    STATUS_CHOICES = [
+        (STATUS_PENDING, "Pending"),
+        (STATUS_APPROVED, "Approved"),
+        (STATUS_CANCELLED, "Cancelled"),
+    ]
+
+    INITIATED_BY_MEMBER = "MEMBER"
+    INITIATED_BY_LEADER = "LEADER"
+    INITIATED_BY_CHOICES = [
+        (INITIATED_BY_MEMBER, "Member"),
+        (INITIATED_BY_LEADER, "Leader"),
+    ]
+
+    group = models.ForeignKey(Group, related_name="removal_requests", on_delete=models.CASCADE)
+    member = models.ForeignKey(User, related_name="group_removal_requests", on_delete=models.CASCADE)
+    initiated_by = models.CharField(max_length=10, choices=INITIATED_BY_CHOICES)
+    member_confirmed = models.BooleanField(default=False)
+    leader_confirmed = models.BooleanField(default=False)
+    status = models.CharField(max_length=12, choices=STATUS_CHOICES, default=STATUS_PENDING)
+    created_at = models.DateTimeField(auto_now_add=True)
+    processed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["group", "member", "status"],
+                condition=models.Q(status="PENDING"),
+                name="unique_pending_group_removal_request",
+            ),
+        ]
+
+    def __str__(self):
+        return f"Removal {self.group.code}:{self.member.username} [{self.status}]"
+
+
+class EmailOTP(models.Model):
+    PURPOSE_SIGNUP = "SIGNUP"
+    PURPOSE_PASSWORD_RESET = "PASSWORD_RESET"
+    PURPOSE_CHOICES = [
+        (PURPOSE_SIGNUP, "Signup"),
+        (PURPOSE_PASSWORD_RESET, "Password Reset"),
+    ]
+
+    email = models.EmailField(db_index=True)
+    purpose = models.CharField(max_length=20, choices=PURPOSE_CHOICES, db_index=True)
+    code = models.CharField(max_length=6)
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField(db_index=True)
+    is_used = models.BooleanField(default=False)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.email} [{self.purpose}]"
+
+    @classmethod
+    def create_code(cls, email: str, purpose: str, code: str, ttl_minutes: int = 10):
+        cls.objects.filter(email=email, purpose=purpose, is_used=False).update(is_used=True)
+        return cls.objects.create(
+            email=email,
+            purpose=purpose,
+            code=code,
+            expires_at=timezone.now() + timedelta(minutes=ttl_minutes),
+        )
+
+    def matches(self, entered_code: str) -> bool:
+        return (not self.is_used) and timezone.now() <= self.expires_at and self.code == (entered_code or "").strip()
+
+
+class APIToken(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="api_token")
+    key = models.CharField(max_length=64, unique=True, db_index=True, default=generate_api_token_key)
+    created_at = models.DateTimeField(auto_now_add=True)
+    last_used_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"API Token for {self.user.username}"
+
+    def rotate(self):
+        self.key = generate_api_token_key()
+        self.save(update_fields=["key", "last_used_at"])
+
+    def touch(self):
+        self.save(update_fields=["last_used_at"])

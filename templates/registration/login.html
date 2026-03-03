@@ -5,19 +5,36 @@
         <div class="glass-panel p-4">
             <h3 class="mb-2 text-center">Welcome back to LabTrack</h3>
             <p class="text-center text-muted small mb-4">Use your campus credentials to continue.</p>
+            {% if form.errors %}
+            <div class="alert alert-danger small">
+                Login failed. Check your username and password, then try again.
+            </div>
+            {% endif %}
+            {% if next and user.is_authenticated %}
+            <div class="alert alert-warning small">
+                Your account does not have access to that page.
+            </div>
+            {% endif %}
             <form method="post" class="mb-3">
                 {% csrf_token %}
-                {{ form.non_field_errors }}
+                {% if form.non_field_errors %}
+                <div class="alert alert-warning py-2 small mb-3">
+                    {{ form.non_field_errors }}
+                </div>
+                {% endif %}
                 <div class="mb-3">
-                    <label class="form-label">Username</label>
+                    <label class="form-label">Full Name</label>
                     <input type="text"
                            name="{{ form.username.html_name }}"
                            value="{{ form.username.value|default_if_none:'' }}"
                            autofocus
-                           autocomplete="username"
+                           autocomplete="name"
                            class="form-control"
-                           placeholder="yourid" />
-                    {{ form.username.errors }}
+                           placeholder="Enter your registered full name" />
+                    <small class="text-muted">Use the same full name entered during signup.</small>
+                    {% if form.username.errors %}
+                    <div class="text-danger small mt-1">{{ form.username.errors|striptags }}</div>
+                    {% endif %}
                 </div>
                 <div class="mb-3">
                     <label class="form-label">Password</label>
@@ -26,7 +43,9 @@
                            autocomplete="current-password"
                            class="form-control"
                            placeholder="••••••••" />
-                    {{ form.password.errors }}
+                    {% if form.password.errors %}
+                    <div class="text-danger small mt-1">{{ form.password.errors|striptags }}</div>
+                    {% endif %}
                 </div>
                 <button class="btn btn-primary w-100">Login</button>
             </form>

@@ -34,7 +34,7 @@
                 <div class="frosted p-3 rounded-3 mb-2">
                     <div class="d-flex justify-content-between">
                         <div>
-                            <div class="fw-semibold">Slip #{{ slip.id }} — {{ slip.student.username }}</div>
+                            <div class="fw-semibold">Slip #{{ slip.id }} — {{ slip.user.username }}</div>
                             <div class="small text-muted">Created {{ slip.created_at|date:"M j, Y h:i A" }}</div>
                         </div>
                         <div class="d-flex gap-2">
@@ -56,7 +56,7 @@
             {% if due_today %}
                 {% for slip in due_today %}
                 <div class="frosted p-3 rounded-3 mb-2">
-                    <div class="fw-semibold">Slip #{{ slip.id }} — {{ slip.student.username }}</div>
+                    <div class="fw-semibold">Slip #{{ slip.id }} — {{ slip.user.username }}</div>
                     <div class="small text-muted">Faculty: {{ slip.faculty.username|default:"—" }}</div>
                     <div class="small text-muted">Due {{ slip.due_date }}</div>
                 </div>
@@ -65,15 +65,39 @@
         </div>
     {% elif role == 'faculty' %}
         <div class="mb-4">
+            <h6 class="text-muted mb-2">Group Approval Requests</h6>
+            {% if my_group_requests %}
+                {% for g in my_group_requests %}
+                <div class="frosted p-3 rounded-3 mb-2">
+                    <div class="d-flex justify-content-between align-items-start gap-2">
+                        <div>
+                            <div class="fw-semibold">{{ g.code }}{% if g.name %} — {{ g.name }}{% endif %}</div>
+                            <div class="small text-muted">{{ g.members.count }} member{{ g.members.count|pluralize }}</div>
+                        </div>
+                        <div class="d-flex gap-2">
+                            <form method="post" action="{% url 'group_approve' g.id %}">
+                                {% csrf_token %}
+                                <button class="btn btn-primary btn-sm">Approve</button>
+                            </form>
+                            <form method="post" action="{% url 'group_reject' g.id %}">
+                                {% csrf_token %}
+                                <button class="btn btn-danger btn-sm">Reject</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}<div class="text-muted">No group requests pending.</div>{% endif %}
+        </div>
+        <div class="mb-4">
             <h6 class="text-muted mb-2">Pending Approvals</h6>
             {% if my_pending %}
                 {% for slip in my_pending %}
                 <div class="frosted p-3 rounded-3 mb-2">
-                    <div class="fw-semibold">Slip #{{ slip.id }} — {{ slip.student.username }}</div>
+                    <div class="fw-semibold">Slip #{{ slip.id }} — {{ slip.user.username }}</div>
                     <div class="small text-muted">Created {{ slip.created_at|date:"M j, Y h:i A" }}</div>
                     <div class="d-flex gap-2 mt-2">
                         <form method="post" action="{% url 'approve_slip' slip.id %}">{% csrf_token %}<button class="btn btn-primary btn-sm">Approve</button></form>
-                        <form method="post" action="{% url 'terminate_slip' slip.id %}">{% csrf_token %}<button class="btn btn-danger btn-sm">Reject</button></form>
                     </div>
                 </div>
                 {% endfor %}
@@ -84,7 +108,7 @@
             {% if my_due %}
                 {% for slip in my_due %}
                 <div class="frosted p-3 rounded-3 mb-2">
-                    <div class="fw-semibold">Slip #{{ slip.id }} — {{ slip.student.username }}</div>
+                    <div class="fw-semibold">Slip #{{ slip.id }} — {{ slip.user.username }}</div>
                     <div class="small text-muted">Due {{ slip.due_date }}</div>
                 </div>
                 {% endfor %}

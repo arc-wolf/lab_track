@@ -1,12 +1,15 @@
 import json
+from datetime import timedelta
 
 from django.contrib.auth.models import User
-from django.test import TestCase
+from django.core.cache import cache
+from django.test import TestCase, override_settings
 from django.urls import reverse
+from django.utils import timezone
 
 from inventory.models import Component
 from requests_app.models import BorrowItem, BorrowRequest
-from users.models import Group, GroupMember, Profile
+from users.models import APIToken, Group, GroupMember, Profile
 
 
 def make_user(username: str, role: str, email: str | None = None) -> User:
@@ -48,6 +51,23 @@ class ApiAccessTests(TestCase):
         token = self._issue_token(self.admin.email)
         self.assertTrue(token)
 
+    def test_issue_token_rejects_ambiguous_full_name(self):
+        u1 = make_user('same_name_1', Profile.ROLE_FACULTY, email='same1@example.com')
+        u2 = make_user('same_name_2', Profile.ROLE_FACULTY, email='same2@example.com')
+        u1.profile.full_name = 'Same Person'
+        u2.profile.full_name = 'Same Person'
+        u1.profile.save(update_fields=['full_name'])
+        u2.profile.save(update_fields=['full_name'])
+
+        response = self.client.post(
+            reverse('api_issue_token'),
+            data=json.dumps({'identity': 'Same Person', 'password': 'pass1234'}),
+            content_type='application/json',
+            secure=True,
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('Multiple accounts use this full name', response.json().get('error', ''))
+
     def test_components_endpoint_requires_token(self):
         response = self.client.get(reverse('api_components'), secure=True)
         self.assertEqual(response.status_code, 401)
@@ -88,3 +108,33 @@ class ApiAccessTests(TestCase):
         self.assertEqual(response.status_code, 200)
         returned_ids = {row['id'] for row in response.json()['requests']}
         self.assertEqual(returned_ids, {own.id, teammate_req.id})
+
+    @override_settings(API_TOKEN_ISSUE_RATE_LIMIT=1, AUTH_RATE_LIMIT_WINDOW_SECONDS=600)
+    def test_issue_token_rate_limit_blocks_repeated_failures(self):
+        cache.clear()
+        first = self.client.post(
+            reverse('api_issue_token'),
+            data=json.dumps({'identity': 'ratelimit_user@example.com', 'password': 'wrong-pass'}),
+            content_type='application/json',
+            secure=True,
+        )
+        second = self.client.post(
+            reverse('api_issue_token'),
+            data=json.dumps({'identity': 'ratelimit_user@example.com', 'password': 'wrong-pass'}),
+            content_type='application/json',
+            secure=True,
+        )
+        self.assertEqual(first.status_code, 401)
+        self.assertEqual(second.status_code, 429)
+
+    @override_settings(API_TOKEN_IDLE_TIMEOUT_SECONDS=1)
+    def test_expired_idle_token_is_rejected(self):
+        token = self._issue_token(self.admin.username)
+        APIToken.objects.filter(key=token).update(last_used_at=timezone.now() - timedelta(seconds=5))
+        response = self.client.get(
+            reverse('api_me'),
+            HTTP_AUTHORIZATION=f'Token {token}',
+            secure=True,
+        )
+        self.assertEqual(response.status_code, 401)
+        self.assertIn('expired', response.json().get('error', '').lower())

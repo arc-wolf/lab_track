@@ -4,6 +4,7 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.contrib.auth.models import User
 from django.contrib.auth.views import LoginView
+from django.core.cache import cache
 from django.core.mail import send_mail
 from django.conf import settings
 from django.db.models import Count, Q
@@ -11,13 +12,16 @@ from django.utils import timezone
 from django.views.decorators.http import require_POST
 from random import randint
 import logging
+import hashlib
 
 from .forms import (
     FullNameAuthenticationForm,
     OTPVerificationForm,
     PasswordResetOTPConfirmForm,
     PasswordResetOTPRequestForm,
+    PHONE_REGEX,
     SignupForm,
+    normalize_phone,
 )
 from .models import EmailOTP, Group, GroupMember, GroupRemovalRequest, Profile
 from requests_app.models import BorrowRequest
@@ -25,15 +29,39 @@ from requests_app.models import BorrowRequest
 logger = logging.getLogger(__name__)
 
 
+def _client_ip(request) -> str:
+    forwarded = request.META.get("HTTP_X_FORWARDED_FOR", "")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    return request.META.get("REMOTE_ADDR", "unknown")
+
+
+def _rate_limited(request, scope: str, identity: str, limit: int, window_seconds: int) -> bool:
+    raw = f"{scope}:{_client_ip(request)}:{(identity or '').strip().lower()}"
+    digest = hashlib.sha256(raw.encode("utf-8")).hexdigest()
+    key = f"rl:{digest}"
+    if cache.add(key, 1, timeout=window_seconds):
+        return False
+    try:
+        count = cache.incr(key)
+    except ValueError:
+        cache.set(key, 1, timeout=window_seconds)
+        count = 1
+    return count > limit
+
+
 def _faculty_user_for_value(raw_value: str):
     value = (raw_value or "").strip()
     if not value:
         return None
-    faculty_qs = User.objects.filter(profile__role=Profile.ROLE_FACULTY)
     return (
-        faculty_qs.filter(username=value).first()
-        or faculty_qs.filter(email__iexact=value).first()
-        or faculty_qs.filter(profile__full_name__iexact=value).first()
+        User.objects.filter(profile__role=Profile.ROLE_FACULTY)
+        .filter(
+            Q(username=value)
+            | Q(email__iexact=value)
+            | Q(profile__full_name__iexact=value)
+        )
+        .first()
     )
 
 
@@ -46,6 +74,14 @@ def _attach_legacy_groups_to_faculty(faculty_user):
             getattr(getattr(faculty_user, "profile", None), "full_name", ""),
         ],
     ).update(faculty=faculty_user)
+
+
+def _validated_phone_or_message(request, raw_phone: str):
+    phone = normalize_phone(raw_phone)
+    if phone and not PHONE_REGEX.match(phone):
+        messages.error(request, "Enter a valid phone number (10-15 digits, optional leading +).")
+        return None
+    return phone
 
 
 @login_required
@@ -119,6 +155,16 @@ def signup(request):
 
         otp_form = OTPVerificationForm(request.POST)
         if otp_form.is_valid():
+            verify_limit = int(getattr(settings, "SIGNUP_OTP_VERIFY_RATE_LIMIT", 10))
+            verify_window = int(getattr(settings, "AUTH_RATE_LIMIT_WINDOW_SECONDS", 600))
+            if _rate_limited(request, "signup_verify", pending_email, verify_limit, verify_window):
+                messages.error(request, "Too many OTP attempts. Please wait a few minutes and try again.")
+                form = SignupForm(initial=pending_data)
+                return render(
+                    request,
+                    "registration/signup.html",
+                    {"form": form, "otp_form": otp_form, "otp_stage": True, "pending_email": pending_email},
+                )
             otp_value = otp_form.cleaned_data["otp"]
             otp_record = (
                 EmailOTP.objects.filter(
@@ -219,11 +265,18 @@ def signup(request):
     return render(request, "registration/signup.html", context)
 
 
+@require_POST
 def resend_signup_otp(request):
     pending_data = request.session.get("pending_signup_data")
     pending_email = request.session.get("pending_signup_email")
     if not pending_data or not pending_email:
         messages.error(request, "No pending signup found. Please register again.")
+        return redirect("signup")
+
+    resend_limit = int(getattr(settings, "OTP_RESEND_RATE_LIMIT", 5))
+    resend_window = int(getattr(settings, "AUTH_RATE_LIMIT_WINDOW_SECONDS", 600))
+    if _rate_limited(request, "signup_resend", pending_email, resend_limit, resend_window):
+        messages.error(request, "Too many OTP resend requests. Please wait a few minutes.")
         return redirect("signup")
 
     code = _generate_otp_code()
@@ -246,24 +299,29 @@ def password_reset_request_otp(request):
         form = PasswordResetOTPRequestForm(request.POST)
         if form.is_valid():
             target_email = form.cleaned_data["email"].strip().lower()
+            req_limit = int(getattr(settings, "PASSWORD_RESET_REQUEST_RATE_LIMIT", 5))
+            req_window = int(getattr(settings, "AUTH_RATE_LIMIT_WINDOW_SECONDS", 600))
+            if _rate_limited(request, "pwd_reset_request", target_email, req_limit, req_window):
+                messages.error(request, "Too many reset requests. Please wait a few minutes.")
+                return render(request, "registration/password_reset_otp_request.html", {"form": form})
+
             user = User.objects.filter(email__iexact=target_email).first()
-            if not user:
-                messages.error(request, "No account found with that email.")
-                return render(request, "registration/password_reset_otp_request.html", {"form": form})
-            code = _generate_otp_code()
-            EmailOTP.create_code(target_email, EmailOTP.PURPOSE_PASSWORD_RESET, code)
-            try:
-                _send_otp_email(target_email, code, "Password Reset")
-            except Exception as exc:
-                logger.exception("Password reset OTP send failed for %s", target_email)
-                messages.error(
-                    request,
-                    f"Unable to send reset OTP now. {exc}" if settings.DEBUG else "Unable to send reset OTP now. Please try again later.",
-                )
-                return render(request, "registration/password_reset_otp_request.html", {"form": form})
             request.session["password_reset_email"] = target_email
             request.session.modified = True
-            messages.info(request, "OTP sent to your email. Use it to set a new password.")
+            if user:
+                code = _generate_otp_code()
+                EmailOTP.create_code(target_email, EmailOTP.PURPOSE_PASSWORD_RESET, code)
+                try:
+                    _send_otp_email(target_email, code, "Password Reset")
+                except Exception as exc:
+                    logger.exception("Password reset OTP send failed for %s", target_email)
+                    messages.error(
+                        request,
+                        f"Unable to send reset OTP now. {exc}" if settings.DEBUG else "Unable to send reset OTP now. Please try again later.",
+                    )
+                    return render(request, "registration/password_reset_otp_request.html", {"form": form})
+            # Generic response to avoid account enumeration.
+            messages.info(request, "If an account exists for this email, a reset OTP has been sent.")
             return redirect("password_reset_otp_confirm")
     else:
         form = PasswordResetOTPRequestForm()
@@ -279,6 +337,15 @@ def password_reset_confirm_otp(request):
     if request.method == "POST":
         form = PasswordResetOTPConfirmForm(request.POST)
         if form.is_valid():
+            verify_limit = int(getattr(settings, "PASSWORD_RESET_OTP_VERIFY_RATE_LIMIT", 10))
+            verify_window = int(getattr(settings, "AUTH_RATE_LIMIT_WINDOW_SECONDS", 600))
+            if _rate_limited(request, "pwd_reset_verify", reset_email, verify_limit, verify_window):
+                messages.error(request, "Too many OTP attempts. Please wait a few minutes and try again.")
+                return render(
+                    request,
+                    "registration/password_reset_otp_confirm.html",
+                    {"form": form, "reset_email": reset_email},
+                )
             otp_record = (
                 EmailOTP.objects.filter(
                     email=reset_email,
@@ -298,8 +365,12 @@ def password_reset_confirm_otp(request):
 
             user = User.objects.filter(email__iexact=reset_email).first()
             if not user:
-                messages.error(request, "Account no longer exists for this email.")
-                return redirect("password_reset")
+                messages.error(request, "Invalid or expired OTP.")
+                return render(
+                    request,
+                    "registration/password_reset_otp_confirm.html",
+                    {"form": form, "reset_email": reset_email},
+                )
 
             user.set_password(form.cleaned_data["new_password1"])
             user.save(update_fields=["password"])
@@ -318,6 +389,7 @@ def password_reset_confirm_otp(request):
     )
 
 
+@require_POST
 def resend_password_reset_otp(request):
     reset_email = request.session.get("password_reset_email")
     if not reset_email:
@@ -326,8 +398,14 @@ def resend_password_reset_otp(request):
 
     user = User.objects.filter(email__iexact=reset_email).first()
     if not user:
-        messages.error(request, "No account found for this reset session.")
-        return redirect("password_reset")
+        messages.info(request, "If an account exists for this email, a reset OTP has been sent.")
+        return redirect("password_reset_otp_confirm")
+
+    resend_limit = int(getattr(settings, "OTP_RESEND_RATE_LIMIT", 5))
+    resend_window = int(getattr(settings, "AUTH_RATE_LIMIT_WINDOW_SECONDS", 600))
+    if _rate_limited(request, "pwd_reset_resend", reset_email, resend_limit, resend_window):
+        messages.error(request, "Too many OTP resend requests. Please wait a few minutes.")
+        return redirect("password_reset_otp_confirm")
 
     code = _generate_otp_code()
     EmailOTP.create_code(reset_email, EmailOTP.PURPOSE_PASSWORD_RESET, code)
@@ -425,7 +503,9 @@ def admin_profile_console(request):
 
     if request.method == "POST":
         full_name = request.POST.get("full_name", "").strip()
-        phone = request.POST.get("phone", "").strip()
+        phone = _validated_phone_or_message(request, request.POST.get("phone", ""))
+        if phone is None:
+            return redirect("admin_profile_console")
         email = request.POST.get("email", "").strip()
         password = request.POST.get("password", "").strip()
 
@@ -460,7 +540,9 @@ def student_profile_console(request):
 
     if request.method == "POST":
         full_name = request.POST.get("full_name", "").strip()
-        phone = request.POST.get("phone", "").strip()
+        phone = _validated_phone_or_message(request, request.POST.get("phone", ""))
+        if phone is None:
+            return redirect("student_profile_console")
         semester = request.POST.get("semester", "").strip()
         student_class = request.POST.get("student_class", "").strip()
         email = request.POST.get("email", "").strip()
@@ -649,7 +731,9 @@ def faculty_profile_console(request):
 
     if request.method == "POST":
         full_name = request.POST.get("full_name", "").strip()
-        phone = request.POST.get("phone", "").strip()
+        phone = _validated_phone_or_message(request, request.POST.get("phone", ""))
+        if phone is None:
+            return redirect("faculty_profile_console")
         email = request.POST.get("email", "").strip()
         password = request.POST.get("password", "").strip()
 

@@ -95,6 +95,7 @@ def generate_borrow_slip_pdf(borrow_request_id):
     batch = getattr(profile, "semester", "") or "________"
     request_date = borrow_request.created_at.date()
     due_date = borrow_request.due_date or (request_date + timedelta(days=45))
+    requester_role = getattr(profile, "role", "")
 
     styles = _build_styles()
 
@@ -168,29 +169,39 @@ def generate_borrow_slip_pdf(borrow_request_id):
         Paragraph("Remarks", styles["TableCell"]),
     ]
 
+    fac = getattr(borrow_request, "faculty", None)
+    staff_name = (
+        getattr(fac.profile, "full_name", "") if fac and hasattr(fac, "profile") else ""
+    ) or (fac.get_full_name() if fac else "") or (fac.username if fac else "") or getattr(profile, "faculty_incharge", "") or "___________________________"
+
     item_rows = []
     for idx, item in enumerate(borrow_request.items.select_related("component"), start=1):
+        rec_date = request_date.strftime("%Y-%m-%d")
+        return_date = due_date.strftime("%Y-%m-%d")
+        staff_display = staff_name if requester_role == "student" else ""
         item_rows.append(
             [
                 Paragraph(str(idx), styles["TableCell"]),
                 Paragraph(item.component.name, styles["TableCell"]),
                 Paragraph(str(item.quantity), styles["TableCell"]),
+                Paragraph(rec_date, styles["TableCell"]),
                 Paragraph("", styles["TableCell"]),
-                Paragraph("", styles["TableCell"]),
-                Paragraph("", styles["TableCell"]),
-                Paragraph("", styles["TableCell"]),
+                Paragraph(return_date, styles["TableCell"]),
+                Paragraph(staff_display, styles["TableCell"]),
                 Paragraph("", styles["TableCell"]),
             ]
         )
 
-    # pad to exactly 10 item rows
+    actual_item_count = len(item_rows)
+
+    # Keep fixed table height (10 body rows) while allowing selective separators.
     while len(item_rows) < 10:
         item_rows.append([Paragraph("", styles["TableCell"]) for _ in headers])
 
     data = [headers] + item_rows[:10]
 
     col_widths = [25, 150, 35, 50, 40, 50, 40, 60]
-    row_heights = [30] + [50] * 10  # header + 10 items ≈ 530 points to fit first page
+    row_heights = [30] + [38] * 10
 
     table = Table(
         data,
@@ -200,36 +211,38 @@ def generate_borrow_slip_pdf(borrow_request_id):
         hAlign="LEFT",
     )
 
-    table_style = TableStyle(
-        [
-            ("BOX", (0, 0), (-1, -1), 1, colors.black),
-            ("BACKGROUND", (0, 0), (-1, 0), colors.whitesmoke),
-            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-            ("FONTSIZE", (0, 0), (-1, 0), 10),
-            ("FONTNAME", (0, 1), (-1, -1), "Helvetica"),
-            ("FONTSIZE", (0, 1), (-1, -1), 10),
-            ("ALIGN", (0, 0), (0, -1), "CENTER"),  # Sl No
-            ("ALIGN", (2, 0), (2, -1), "CENTER"),  # Qty
-            ("ALIGN", (3, 0), (6, -1), "CENTER"),  # dates/signs
-            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-            ("LEFTPADDING", (0, 0), (-1, -1), 4),
-            ("RIGHTPADDING", (0, 0), (-1, -1), 4),
-        ]
-    )
+    style_cmds = [
+        ("BOX", (0, 0), (-1, -1), 1, colors.black),
+        ("BACKGROUND", (0, 0), (-1, 0), colors.whitesmoke),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("FONTSIZE", (0, 0), (-1, 0), 10),
+        ("FONTNAME", (0, 1), (-1, -1), "Helvetica"),
+        ("FONTSIZE", (0, 1), (-1, -1), 10),
+        ("ALIGN", (0, 0), (0, -1), "CENTER"),  # Sl No
+        ("ALIGN", (2, 0), (2, -1), "CENTER"),  # Qty
+        ("ALIGN", (3, 0), (6, -1), "CENTER"),  # dates/signs
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 4),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+        # Header separator.
+        ("LINEBELOW", (0, 0), (-1, 0), 0.75, colors.black),
+    ]
 
-    # Full vertical separators for all rows (header + data)
-    for col_idx in range(1, len(headers)):
-        table_style.add("LINEBEFORE", (col_idx, 0), (col_idx, len(data) - 1), 1, colors.black)
+    # Vertical separators across full table height.
+    for col in range(len(headers) - 1):
+        style_cmds.append(("LINEAFTER", (col, 0), (col, -1), 0.75, colors.black))
+
+    # Horizontal separators only for rows that contain real items.
+    for row_idx in range(1, actual_item_count + 1):
+        style_cmds.append(("LINEBELOW", (0, row_idx), (-1, row_idx), 0.75, colors.black))
+
+    table_style = TableStyle(style_cmds)
 
     table.setStyle(table_style)
     elements.append(table)
     elements.append(Spacer(1, 12))
 
     # Footer
-    fac = getattr(borrow_request, "faculty", None)
-    staff_name = (
-        getattr(fac.profile, "full_name", "") if fac and hasattr(fac, "profile") else ""
-    ) or (fac.get_full_name() if fac else "") or (fac.username if fac else "") or getattr(profile, "faculty_incharge", "") or "___________________________"
     footer_lines = [
         f"Staff In Charge Name : {staff_name}",
         "Sign : ___________________________",

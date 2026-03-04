@@ -28,7 +28,7 @@
         </div>
         <div class="col-md-6">
             <label class="form-label">Phone</label>
-            <input class="form-control" name="phone" value="{{ student_profile.phone|default:'' }}">
+            <input class="form-control" name="phone" value="{{ student_profile.phone|default:'' }}" inputmode="tel" pattern="^\+?[0-9]{10,15}$" title="Use 10-15 digits, optional leading +" placeholder="+919876543210">
         </div>
         <div class="col-md-6">
             <label class="form-label">Semester</label>
@@ -52,4 +52,3 @@
     </form>
 </div>
 {% endblock %}
-

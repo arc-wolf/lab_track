@@ -35,9 +35,9 @@ This file must be updated on every functional code change.
   - Account is created only after OTP verification.
   - OTP validity: 10 minutes.
   - Resend OTP supported.
-- Login is **Full Name + Password**:
-  - Login form accepts full name.
-  - Backend resolves full name to internal username.
+- Login is **Identity + Password**:
+  - Login form accepts full name or registered email.
+  - Backend resolves identity to internal username.
   - If multiple accounts share the same full name, login is blocked with explicit message.
 - Forgot-password flow is **OTP-based** (not link-only):
   - User enters registered email.
@@ -47,6 +47,7 @@ This file must be updated on every functional code change.
   - `create group`: generates unique Group ID.
   - `join group`: case-insensitive group code validation and normalization.
 - Student `Faculty Incharge` is restricted to select-only from registered faculty list.
+- Phone numbers are validated to allow only 10-15 digits with optional leading `+`.
 - Full name is mandatory in signup for both students and faculty.
 - Admin seed account:
   - Username: `lab_admin`
@@ -178,6 +179,7 @@ Due policy:
   - `400`, `403`, `403_csrf`, `404`, `500`
 - These are active when `DEBUG=False`.
 - Runtime action feedback uses toast messages (top-right) with severity color + auto-hide.
+- Authenticated HTML responses use no-store/no-cache headers to reduce stale private pages shown via browser Back after logout.
 
 ### 4.10 Mobile/External API Access
 - Token-based JSON API is available under `/api/` for mobile clients (e.g., Flutter).
@@ -208,6 +210,12 @@ Due policy:
 - Admin analytics optimization:
   - `requests/admin/data-console` was refactored from per-component nested query loops to bulk aggregate queries.
   - Maintenance queue keyword detection now filters in DB instead of scanning all returned rows in Python.
+- Production efficiency hardening:
+  - Added DB connection reuse setting under `DATABASES['default']['CONN_MAX_AGE']` (env-driven).
+  - Added configurable cache backend (`locmem` or Redis) and cached DB sessions for lower auth/session DB load.
+  - Added gzip middleware for compressed responses.
+  - Added targeted DB indexes on high-traffic query paths (`BorrowRequest`, `BorrowAction`, `BorrowItem`, `Profile`, `Group`, `GroupMember`, `GroupRemovalRequest`).
+  - Reduced repeated DB lookups in faculty resolution logic and cached component category list for dashboard rendering.
 
 ## 5) Data Model Additions/Alterations
 - `requests_app.BorrowRequest`
@@ -240,7 +248,7 @@ Due policy:
   - `/requests/admin/reports-console/` -> reports
   - `/users/admin/profile-console/` -> admin profile
 - Auth/Recovery:
-  - `/accounts/login/` -> full-name login view
+  - `/accounts/login/` -> identity login view (full name or email)
   - `/accounts/signup/` -> OTP-enabled signup
   - `/accounts/signup/resend-otp/` -> resend signup OTP
   - `/accounts/password-reset/` and `/accounts/password_reset/` -> OTP reset request
@@ -288,7 +296,26 @@ Whenever any functionality changes:
 
 3. If DB schema changes, include migration and note it in change log.
 
-## 9) Change Log (append-only, newest first)
+## 9) Known Risks / Cleanup Backlog
+- Secrets hygiene:
+  - `.env` is currently tracked in git and contains real SMTP credentials in this repository state.
+  - Action required: rotate credentials, remove secrets from VCS history, and keep only `.env.example` in repo.
+- Repository hygiene:
+  - `__pycache__/` and `.pyc` artifacts are currently tracked.
+  - Action required: remove tracked caches and keep only source-controlled files.
+- Background task reliability:
+  - Reminder task marks `reminder_sent=True` even if mail delivery fails; retries are skipped after transient failures.
+  - Action required: mark as sent only on successful send (or add explicit retry/failure state).
+- Rate-limit consistency:
+  - Auth/API rate limits rely on Django cache; without shared cache backend, multi-worker deployments can get inconsistent enforcement.
+  - Action required: configure shared cache (e.g., Redis) for production.
+
+## 10) Change Log (append-only, newest first)
+- 2026-03-04: Added `docs/API_POSTMAN_TESTING.md` and inline API endpoint comments in `api/urls.py` for faster Postman-based validation.
+- 2026-03-04: Added beginner-friendly `docs/TUTORIAL.md` and linked it from project docs for onboarding from zero programming background.
+- 2026-03-04: Added production-efficiency hardening (cache backend config, DB connection reuse, gzip middleware, query/index optimization, and hot-path caching).
+- 2026-03-04: Added no-store cache headers for authenticated pages, identity login (full-name or email), and stronger phone validation.
+- 2026-03-04: Synced docs with current code behavior and added explicit known-risk backlog (secrets, cache artifacts, reminder retry semantics, cache-backed rate limiting).
 - 2026-03-03: Optimized admin analytics and maintenance queue query paths to reduce N+1/per-component query load.
 - 2026-03-03: Fixed signup form behavior for faculty submissions and preserved student group mode selection on validation errors.
 - 2026-03-03: Added API serializer module (`api/serializers.py`) and routed API responses through centralized serializers.

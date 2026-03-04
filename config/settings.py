@@ -91,10 +91,12 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'django.middleware.gzip.GZipMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'users.middleware.NoStoreForAuthenticatedPagesMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
@@ -126,10 +128,32 @@ DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
         'NAME': BASE_DIR / 'db.sqlite3',
-        
+        'CONN_MAX_AGE': int(os.getenv("DJANGO_DB_CONN_MAX_AGE", "60")),
     }
 }
-CONN_MAX_AGE = 60
+
+# Cache backend (default: in-memory; production recommended: Redis)
+_cache_backend = os.getenv("DJANGO_CACHE_BACKEND", "locmem").lower()
+if _cache_backend == "redis":
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.redis.RedisCache",
+            "LOCATION": os.getenv("DJANGO_CACHE_URL", "redis://127.0.0.1:6379/1"),
+        }
+    }
+else:
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+            "LOCATION": "labtrack-local-cache",
+        }
+    }
+
+SESSION_ENGINE = os.getenv(
+    "DJANGO_SESSION_ENGINE",
+    "django.contrib.sessions.backends.cached_db",
+)
+SESSION_CACHE_ALIAS = "default"
 
 # Password validation
 # https://docs.djangoproject.com/en/6.0/ref/settings/#auth-password-validators
@@ -171,6 +195,16 @@ EMAIL_HOST_PASSWORD = os.getenv("DJANGO_EMAIL_HOST_PASSWORD", "")
 DEFAULT_FROM_EMAIL = os.getenv("DJANGO_FROM_EMAIL", "labtrack@localhost")
 LOGIN_REDIRECT_URL = '/'
 LOGOUT_REDIRECT_URL = '/accounts/login/'
+
+# Authentication / OTP throttling (seconds + max attempts within window)
+AUTH_RATE_LIMIT_WINDOW_SECONDS = int(os.getenv("AUTH_RATE_LIMIT_WINDOW_SECONDS", "600"))
+SIGNUP_OTP_VERIFY_RATE_LIMIT = int(os.getenv("SIGNUP_OTP_VERIFY_RATE_LIMIT", "10"))
+PASSWORD_RESET_OTP_VERIFY_RATE_LIMIT = int(os.getenv("PASSWORD_RESET_OTP_VERIFY_RATE_LIMIT", "10"))
+PASSWORD_RESET_REQUEST_RATE_LIMIT = int(os.getenv("PASSWORD_RESET_REQUEST_RATE_LIMIT", "5"))
+OTP_RESEND_RATE_LIMIT = int(os.getenv("OTP_RESEND_RATE_LIMIT", "5"))
+API_TOKEN_ISSUE_RATE_LIMIT = int(os.getenv("API_TOKEN_ISSUE_RATE_LIMIT", "20"))
+API_TOKEN_MAX_AGE_DAYS = int(os.getenv("API_TOKEN_MAX_AGE_DAYS", "30"))
+API_TOKEN_IDLE_TIMEOUT_SECONDS = int(os.getenv("API_TOKEN_IDLE_TIMEOUT_SECONDS", "1209600"))
 
 
 # Celery Configuration

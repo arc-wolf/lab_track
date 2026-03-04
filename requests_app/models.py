@@ -62,6 +62,14 @@ class BorrowRequest(models.Model):
     return_condition = models.CharField(max_length=200, blank=True)
     return_time = models.DateTimeField(null=True, blank=True)
 
+    class Meta:
+        indexes = [
+            models.Index(fields=["faculty", "status", "created_at"], name="brreq_fac_stat_created_idx"),
+            models.Index(fields=["group", "status", "created_at"], name="brreq_grp_stat_created_idx"),
+            models.Index(fields=["status", "due_date"], name="borrowreq_status_due_idx"),
+            models.Index(fields=["status", "reminder_sent", "due_date"], name="borrowreq_status_rem_due_idx"),
+        ]
+
     def __init__(self, *args, **kwargs):
         # Backward-compat kwargs still used across views/tests/templates.
         student = kwargs.pop("student", None)
@@ -183,6 +191,11 @@ class BorrowItem(models.Model):
     component = models.ForeignKey(Component, on_delete=models.PROTECT, related_name="borrow_items", db_index=True)
     quantity = models.PositiveIntegerField()
 
+    class Meta:
+        indexes = [
+            models.Index(fields=["borrow_request", "component"], name="borrowitem_req_comp_idx"),
+        ]
+
     def __init__(self, *args, **kwargs):
         request = kwargs.pop("request", None)
         super().__init__(*args, **kwargs)
@@ -228,6 +241,10 @@ class BorrowAction(models.Model):
 
     class Meta:
         ordering = ["-timestamp"]
+        indexes = [
+            models.Index(fields=["borrow_request", "timestamp"], name="borrowaction_req_ts_idx"),
+            models.Index(fields=["action", "timestamp"], name="borrowaction_action_ts_idx"),
+        ]
 
 
 class LabPolicy(models.Model):

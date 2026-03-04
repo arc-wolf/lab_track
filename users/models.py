@@ -23,10 +23,10 @@ class Profile(models.Model):
     ]
 
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="profile")
-    role = models.CharField(max_length=20, choices=ROLE_CHOICES, default=ROLE_STUDENT)
+    role = models.CharField(max_length=20, choices=ROLE_CHOICES, default=ROLE_STUDENT, db_index=True)
     semester = models.CharField(max_length=20, blank=True)
     student_class = models.CharField(max_length=50, blank=True)
-    group_id = models.CharField(max_length=50, blank=True)
+    group_id = models.CharField(max_length=50, blank=True, db_index=True)
     group_name = models.CharField(max_length=100, blank=True)
     phone = models.CharField(max_length=20, blank=True)
     faculty_incharge = models.CharField(max_length=100, blank=True)
@@ -59,6 +59,12 @@ class Group(models.Model):
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_PENDING)
     created_at = models.DateTimeField(auto_now_add=True)
 
+    class Meta:
+        indexes = [
+            models.Index(fields=["status", "created_at"], name="group_status_created_idx"),
+            models.Index(fields=["faculty", "status", "created_at"], name="group_fac_status_created_idx"),
+        ]
+
     def __str__(self):
         return self.code
 
@@ -79,6 +85,9 @@ class GroupMember(models.Model):
     class Meta:
         constraints = [
             models.UniqueConstraint(fields=["group", "user"], name="unique_group_user"),
+        ]
+        indexes = [
+            models.Index(fields=["group", "role"], name="groupmember_group_role_idx"),
         ]
 
     def __str__(self):
@@ -118,6 +127,9 @@ class GroupRemovalRequest(models.Model):
                 condition=models.Q(status="PENDING"),
                 name="unique_pending_group_removal_request",
             ),
+        ]
+        indexes = [
+            models.Index(fields=["group", "status", "created_at"], name="grprem_grp_stat_created_idx"),
         ]
 
     def __str__(self):

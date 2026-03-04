@@ -18,8 +18,7 @@ def send_due_reminders():
         status__in=[BorrowRequest.STATUS_APPROVED, BorrowRequest.STATUS_ISSUED],
         reminder_sent=False,
         due_date__isnull=False,
-        due_date__gte=target_date,
-        due_date__lte=target_date,
+        due_date=target_date,
     )
 
     for req in qs:

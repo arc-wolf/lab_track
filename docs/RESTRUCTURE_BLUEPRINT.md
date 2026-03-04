@@ -23,7 +23,7 @@
 ## Domain Rules (Canonical)
 - Students can reserve/borrow only when their group is approved.
 - Borrow lifecycle: `PENDING -> APPROVED -> ISSUED -> RETURNED`, with side paths `REJECTED`, `OVERDUE`, `PENALTY`.
-- Stock lock happens in reservations; stock deduction on `ISSUED`; stock restore on `RETURNED` or rejection before issue.
+- Stock lock happens at reservation/cart stage; `ISSUED` is a state transition only; stock restore happens on `RETURNED` and `REJECTED`.
 - Every status transition writes an audit action.
 
 ## Phased Plan
@@ -62,6 +62,10 @@
 - Performance:
   - Major admin data-console query path refactored from per-component loops to bulk aggregates.
   - Maintenance queue keyword scanning moved to DB filtering.
+- Ops hygiene backlog:
+  - `.env` secrets are tracked in repo state and must be rotated + removed from VCS.
+  - `__pycache__/` artifacts are tracked and should be purged from source control.
+  - Reminder task currently marks reminders as sent even when email send fails; retry-safe behavior is pending.
 
 ## Testing Strategy
 - Unit tests for lifecycle transitions and stock safety.

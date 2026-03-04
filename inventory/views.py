@@ -3,9 +3,10 @@ from datetime import timedelta
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.core.cache import cache
 from django.db import transaction
 from django.db.models.deletion import ProtectedError
-from django.db.models import Sum
+from django.db.models import Q, Sum
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
@@ -45,22 +46,15 @@ def _ensure_group(user):
         group.save(update_fields=["name"])
     if profile.faculty_incharge and not group.faculty:
         faculty = (
-            Profile.objects.filter(role=Profile.ROLE_FACULTY, user__username=profile.faculty_incharge)
+            Profile.objects.filter(role=Profile.ROLE_FACULTY)
+            .filter(
+                Q(user__username=profile.faculty_incharge)
+                | Q(user__email__iexact=profile.faculty_incharge)
+                | Q(full_name__iexact=profile.faculty_incharge)
+            )
             .select_related("user")
             .first()
         )
-        if not faculty:
-            faculty = (
-                Profile.objects.filter(role=Profile.ROLE_FACULTY, user__email__iexact=profile.faculty_incharge)
-                .select_related("user")
-                .first()
-            )
-        if not faculty:
-            faculty = (
-                Profile.objects.filter(role=Profile.ROLE_FACULTY, full_name__iexact=profile.faculty_incharge)
-                .select_related("user")
-                .first()
-            )
         if faculty:
             group.faculty = faculty.user
             group.save(update_fields=["faculty"])
@@ -106,7 +100,10 @@ def student_dashboard(request):
     if search_query:
         components = components.filter(name__icontains=search_query)
 
-    categories = Component.objects.values_list("category", flat=True).distinct()
+    categories = cache.get("inventory_categories_v1")
+    if categories is None:
+        categories = list(Component.objects.values_list("category", flat=True).distinct())
+        cache.set("inventory_categories_v1", categories, timeout=300)
 
     # summary
     if request.user.profile.role == Profile.ROLE_STUDENT and group:
@@ -429,6 +426,7 @@ def admin_component_create(request):
         form = ComponentForm(request.POST)
         if form.is_valid():
             form.save()
+            cache.delete("inventory_categories_v1")
             messages.success(request, "Component added.")
             return redirect("admin_components")
     else:
@@ -447,6 +445,7 @@ def admin_component_edit(request, pk):
         form = ComponentForm(request.POST, instance=component)
         if form.is_valid():
             form.save()
+            cache.delete("inventory_categories_v1")
             messages.success(request, "Component updated.")
             return redirect("admin_components")
     else:
@@ -464,6 +463,7 @@ def admin_component_delete(request, pk):
     if request.method == "POST":
         try:
             component.delete()
+            cache.delete("inventory_categories_v1")
         except ProtectedError:
             messages.error(
                 request,

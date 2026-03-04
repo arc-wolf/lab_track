@@ -43,7 +43,7 @@ Primary objective: preserve working flows, close loopholes, and evolve features 
   - `@am.amrita.edu` => faculty
 - Full name is first-class identity for users:
   - Signup asks full name (internal username auto-generated).
-  - Login uses full name + password.
+  - Login accepts full name or email + password.
 - Signup is OTP verified by email (6-digit, 10 min).
 - Forgot-password is OTP based (6-digit, 10 min).
 - Student faculty-incharge must be selected from registered faculty list only.
@@ -92,6 +92,13 @@ Primary objective: preserve working flows, close loopholes, and evolve features 
   - `DJANGO_EMAIL_HOST_USER`, `DJANGO_EMAIL_HOST_PASSWORD`, `DJANGO_FROM_EMAIL`
 - `.env` loading is expected in settings.
 - Celery tasks power scheduled reminders/overdue updates.
+- Rate limiting depends on Django cache; production should use a shared backend (Redis/memcached), not local-memory cache.
+
+## Repo Hygiene Requirements
+
+- Never commit secrets (`.env`, API keys, SMTP passwords) to source control.
+- Never commit generated cache artifacts (`__pycache__/`, `.pyc`).
+- Keep docs and behavior in sync whenever lifecycle/security semantics change.
 
 ## Response/Execution Expectation
 
@@ -99,6 +106,8 @@ Primary objective: preserve working flows, close loopholes, and evolve features 
 - Explain functional impact of each change.
 - Run checks/tests after modifications.
 - If uncertain about behavior, inspect existing flow before patching.
+- Keep learning docs in sync for newcomers:
+  - `docs/TUTORIAL.md` must reflect current project structure and implemented concepts.
 
 ---
 

@@ -1,10 +1,21 @@
 {% extends "base.html" %}
 {% block content %}
+<style>
+    @media (max-width: 768px) {
+        #student-section .d-flex.gap-3 {
+            flex-direction: column;
+            gap: 0.55rem !important;
+        }
+    }
+</style>
 <div class="row justify-content-center">
     <div class="col-12 signup-shell">
         <div class="glass-panel p-4">
         <h3 class="mb-2 text-center">Create your LabTrack account</h3>
         <p class="text-center text-muted mb-4 small">Use your official Amrita email to auto-classify as Student or Faculty/Staff.</p>
+        <div class="d-flex justify-content-end mb-2">
+            <button type="button" class="btn btn-outline-light btn-sm" onclick="history.back()">Back</button>
+        </div>
 
         {% if form.errors %}
         <div class="alert alert-danger">
@@ -37,7 +48,10 @@
             <button class="btn btn-primary w-100 mt-2">Verify OTP & Create Account</button>
         </form>
         <div class="text-center mt-3">
-            <a href="{% url 'resend_signup_otp' %}" class="small">Resend OTP</a>
+            <form method="post" action="{% url 'resend_signup_otp' %}" class="d-inline">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-link p-0 small text-decoration-none">Resend OTP</button>
+            </form>
         </div>
         {% else %}
         <form method="post" id="signup-form">
@@ -62,6 +76,7 @@
             <div class="mb-3">
                 <label class="form-label">Phone</label>
                 {{ form.phone }}
+                <small class="text-muted d-block mt-1">Use 10-15 digits, optional leading + (example: +919876543210).</small>
                 {{ form.phone.errors }}
             </div>
             <div class="row g-3">
@@ -82,7 +97,7 @@
                 <p class="fw-bold text-warning mb-2">Section B: Student Details</p>
                 <div class="mb-3">
                     <label class="form-label">Group Option</label>
-                    <div class="d-flex gap-3">
+                    <div class="d-flex gap-3 flex-wrap">
                         <label class="form-check">
                             <input
                                 type="radio"
@@ -173,7 +188,6 @@
                 domainHint.classList.add('d-none');
                 setRequired(studentSection, true);
                 setRequired(facultySection, false);
-                toggleGroupMode();
             } else if (email.endsWith('@am.amrita.edu')) {
                 facultySection.classList.remove('d-none');
                 studentSection.classList.add('d-none');
@@ -187,6 +201,8 @@
                 setRequired(studentSection, false);
                 setRequired(facultySection, false);
             }
+            // Always re-evaluate group required flags after visibility changes.
+            toggleGroupMode();
         }
 
         function setRequired(container, state) {

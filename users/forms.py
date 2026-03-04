@@ -3,8 +3,17 @@ from django.contrib.auth.forms import AuthenticationForm
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth.models import User
 from secrets import token_hex
+import re
 from .models import Profile, Group
 from django.utils.text import slugify
+
+
+PHONE_REGEX = re.compile(r"^\+?[0-9]{10,15}$")
+
+
+def normalize_phone(raw_value: str) -> str:
+    value = (raw_value or "").strip().replace(" ", "").replace("-", "")
+    return value
 
 
 class SignupForm(UserCreationForm):
@@ -75,6 +84,12 @@ class SignupForm(UserCreationForm):
         else:
             raise forms.ValidationError("Use an Amrita organization email.")
         return email
+
+    def clean_phone(self):
+        phone = normalize_phone(self.cleaned_data.get("phone", ""))
+        if phone and not PHONE_REGEX.match(phone):
+            raise forms.ValidationError("Enter a valid phone number (10-15 digits, optional leading +).")
+        return phone
 
     def clean(self):
         cleaned = super().clean()
@@ -158,6 +173,14 @@ class SignupForm(UserCreationForm):
             existing = field.widget.attrs.get("class", "")
             field.widget.attrs["class"] = f"{existing} {common_classes}".strip()
             field.widget.attrs.setdefault("placeholder", field.label)
+        if "phone" in self.fields:
+            self.fields["phone"].widget.attrs.update(
+                {
+                    "inputmode": "tel",
+                    "pattern": r"^\+?[0-9]{10,15}$",
+                    "placeholder": "+919876543210",
+                }
+            )
         faculty_qs = (
             Profile.objects.filter(role=Profile.ROLE_FACULTY)
             .select_related("user")
@@ -175,22 +198,32 @@ class SignupForm(UserCreationForm):
 
 class FullNameAuthenticationForm(AuthenticationForm):
     username = forms.CharField(
-        label="Full Name",
+        label="Full Name or Email",
         max_length=150,
-        widget=forms.TextInput(attrs={"autofocus": True, "autocomplete": "name"}),
+        widget=forms.TextInput(attrs={"autofocus": True, "autocomplete": "username"}),
     )
 
     def clean(self):
         entered_identity = (self.cleaned_data.get("username") or "").strip()
         if entered_identity:
-            matches = User.objects.filter(profile__full_name__iexact=entered_identity).distinct()
-            match_count = matches.count()
-            if match_count == 1:
-                self.cleaned_data["username"] = matches.first().username
-            elif match_count > 1:
-                raise forms.ValidationError(
-                    "Multiple accounts use this full name. Contact lab admin to resolve duplication."
-                )
+            if "@" in entered_identity:
+                email_matches = User.objects.filter(email__iexact=entered_identity).distinct()
+                match_count = email_matches.count()
+                if match_count == 1:
+                    self.cleaned_data["username"] = email_matches.first().username
+                elif match_count > 1:
+                    raise forms.ValidationError(
+                        "Multiple accounts use this email. Contact lab admin to resolve duplication."
+                    )
+            else:
+                name_matches = User.objects.filter(profile__full_name__iexact=entered_identity).distinct()
+                match_count = name_matches.count()
+                if match_count == 1:
+                    self.cleaned_data["username"] = name_matches.first().username
+                elif match_count > 1:
+                    raise forms.ValidationError(
+                        "Multiple accounts use this full name. Contact lab admin to resolve duplication."
+                    )
         return super().clean()
 
 

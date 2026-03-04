@@ -13,7 +13,7 @@
             <a href="{% url 'admin_dashboard' %}#permission-console" class="btn btn-outline-primary">Request Console</a>
             <a href="{% url 'admin_component_console' %}" class="btn btn-secondary">Component Console</a>
             <a href="{% url 'admin_data_console' %}" class="btn btn-primary">Data Console</a>
-            <a href="{% url 'admin_profile_console' %}" class="btn btn-outline-light">Profile Console</a>
+            <a href="{% url 'admin_profile_console' %}" class="btn btn-outline-theme">Profile Console</a>
         </div>
     </div>
 </section>
@@ -289,8 +289,8 @@
                             {% if slip.status == 'ISSUED' or slip.status == 'OVERDUE' %}
                             <form method="post" action="{% url 'mark_penalty' slip.id %}" class="d-flex gap-1">
                                 {% csrf_token %}
-                                <input type="text" name="note" class="form-control form-control-sm" placeholder="Penalty note" aria-label="Penalty note">
-                                <button type="submit" class="btn btn-dark btn-sm">Penalty</button>
+                                <input type="text" name="note" class="form-control form-control-sm penalty-note-input" placeholder="Penalty note" aria-label="Penalty note">
+                                <button type="submit" class="btn btn-secondary btn-sm">Penalty</button>
                             </form>
                             {% endif %}
                         </div>

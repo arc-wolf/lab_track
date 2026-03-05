@@ -16,7 +16,7 @@
         {% csrf_token %}
         <div class="col-md-6">
             <label class="form-label">Username</label>
-            <input class="form-control" value="{{ request.user.username }}" disabled>
+            <input class="form-control" name="username" value="{{ request.user.username }}" required>
         </div>
         <div class="col-md-6">
             <label class="form-label">Group ID</label>
@@ -24,11 +24,11 @@
         </div>
         <div class="col-md-6">
             <label class="form-label">Full Name</label>
-            <input class="form-control" name="full_name" value="{{ student_profile.full_name|default:'' }}">
+            <input class="form-control" name="full_name" value="{{ student_profile.full_name|default:'' }}" maxlength="150" required>
         </div>
         <div class="col-md-6">
             <label class="form-label">Phone</label>
-            <input class="form-control" name="phone" value="{{ student_profile.phone|default:'' }}" inputmode="tel" pattern="^\+?[0-9]{10,15}$" title="Use 10-15 digits, optional leading +" placeholder="+919876543210">
+            <input class="form-control" name="phone" value="{{ student_profile.phone|default:'' }}" inputmode="tel" pattern="^\d{10}$" title="Use exactly 10 digits" placeholder="9876543210" required>
         </div>
         <div class="col-md-6">
             <label class="form-label">Semester</label>
@@ -40,7 +40,8 @@
         </div>
         <div class="col-md-6">
             <label class="form-label">Email</label>
-            <input type="email" class="form-control" name="email" value="{{ request.user.email|default:'' }}">
+            <input type="email" class="form-control" name="email" value="{{ request.user.email|default:'' }}" readonly>
+            <small class="text-muted">Email is verified and locked for student accounts.</small>
         </div>
         <div class="col-md-6">
             <label class="form-label">New Password</label>

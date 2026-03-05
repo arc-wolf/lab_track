@@ -8,7 +8,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from inventory.models import Component
-from requests_app.models import BorrowItem, BorrowRequest
+from requests_app.models import BorrowItem, BorrowRequest, LabPolicy
 from users.models import APIToken, Group, GroupMember, Profile
 
 
@@ -72,6 +72,21 @@ class ApiAccessTests(TestCase):
         response = self.client.get(reverse('api_components'), secure=True)
         self.assertEqual(response.status_code, 401)
 
+    def test_components_payload_includes_component_fine_overrides(self):
+        self.component.fine_per_day = 20
+        self.component.fine_damaged = 500
+        self.component.save(update_fields=['fine_per_day', 'fine_damaged'])
+        token = self._issue_token(self.admin.username)
+        response = self.client.get(
+            reverse('api_components'),
+            HTTP_AUTHORIZATION=f'Token {token}',
+            secure=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        first = response.json()['components'][0]
+        self.assertIn('fine_per_day', first)
+        self.assertIn('fine_damaged', first)
+
     def test_me_endpoint_returns_profile_payload(self):
         token = self._issue_token(self.student.username)
         response = self.client.get(
@@ -83,6 +98,7 @@ class ApiAccessTests(TestCase):
         payload = response.json()['user']
         self.assertEqual(payload['username'], self.student.username)
         self.assertEqual(payload['role'], Profile.ROLE_STUDENT)
+        self.assertIn('email_locked', payload)
 
     def test_student_requests_are_group_scoped(self):
         teammate = make_user('api_teammate', Profile.ROLE_STUDENT)
@@ -138,3 +154,72 @@ class ApiAccessTests(TestCase):
         )
         self.assertEqual(response.status_code, 401)
         self.assertIn('expired', response.json().get('error', '').lower())
+
+    def test_admin_overview_requires_admin_role(self):
+        token = self._issue_token(self.student.username)
+        response = self.client.get(
+            reverse('api_admin_overview'),
+            HTTP_AUTHORIZATION=f'Token {token}',
+            secure=True,
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_admin_console_map_available_for_admin(self):
+        token = self._issue_token(self.admin.username)
+        response = self.client.get(
+            reverse('api_admin_console_map'),
+            HTTP_AUTHORIZATION=f'Token {token}',
+            secure=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        payload = response.json().get('console_map', {})
+        self.assertIn('request_console', payload)
+
+    def test_admin_can_update_component_fines(self):
+        token = self._issue_token(self.admin.username)
+        response = self.client.post(
+            reverse('api_admin_update_component_fines', args=[self.component.id]),
+            data=json.dumps({'fine_per_day': 30, 'fine_damaged': 900, 'fine_missing_parts': None}),
+            content_type='application/json',
+            HTTP_AUTHORIZATION=f'Token {token}',
+            secure=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.component.refresh_from_db()
+        self.assertEqual(self.component.fine_per_day, 30)
+        self.assertEqual(self.component.fine_damaged, 900)
+        self.assertIsNone(self.component.fine_missing_parts)
+
+    def test_non_admin_cannot_update_component_fines(self):
+        token = self._issue_token(self.student.username)
+        response = self.client.post(
+            reverse('api_admin_update_component_fines', args=[self.component.id]),
+            data=json.dumps({'fine_per_day': 30}),
+            content_type='application/json',
+            HTTP_AUTHORIZATION=f'Token {token}',
+            secure=True,
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_admin_policy_get_and_update(self):
+        token = self._issue_token(self.admin.username)
+        read_response = self.client.get(
+            reverse('api_admin_policy'),
+            HTTP_AUTHORIZATION=f'Token {token}',
+            secure=True,
+        )
+        self.assertEqual(read_response.status_code, 200)
+        self.assertIn('policy', read_response.json())
+
+        update_response = self.client.post(
+            reverse('api_admin_update_policy'),
+            data=json.dumps({'per_day_fine': 99, 'maintenance_keywords': 'service,damaged', 'notes': 'updated'}),
+            content_type='application/json',
+            HTTP_AUTHORIZATION=f'Token {token}',
+            secure=True,
+        )
+        self.assertEqual(update_response.status_code, 200)
+        policy = LabPolicy.objects.get(id=1)
+        self.assertEqual(policy.per_day_fine, 99)
+        self.assertEqual(policy.maintenance_keywords, 'service,damaged')
+        self.assertEqual(policy.notes, 'updated')

@@ -4,12 +4,12 @@
 <section class="glass-panel p-4 mb-4 position-relative overflow-hidden">
     <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
         <div>
-            <div class="hero-eyebrow mb-1">Faculty Console</div>
-            <h2 class="mb-1 fw-bold">Components & Stock</h2>
-            <p class="text-muted mb-0">Admin tools to view component stock, allocations, and new requests.</p>
+            <div class="hero-eyebrow mb-1">Inventory Operations</div>
+            <h2 class="mb-1 fw-bold">Components and Stock</h2>
+            <p class="text-muted mb-0">Review inventory health and recent faculty-origin requests.</p>
         </div>
         <div class="d-flex gap-2 flex-wrap">
-            <a href="{% url 'admin_dashboard' %}" class="btn btn-outline-secondary">Back to Admin Dashboard</a>
+            <a href="{% url 'admin_dashboard' %}" class="btn btn-outline-secondary">Admin Dashboard</a>
             <a href="{% url 'admin_components' %}" class="btn btn-primary">Open Inventory</a>
         </div>
     </div>
@@ -26,7 +26,7 @@
         <a class="status-chip" href="{% url 'admin_components' %}">Browse inventory</a>
         <a class="status-chip" href="{% url 'admin_component_create' %}">Add new component</a>
         <a class="status-chip" href="{% url 'admin_components' %}?stock=low">Low-stock items</a>
-        <a class="status-chip" href="{% url 'admin_maintenance_queue' %}">Maintenance queue</a>
+        <a class="status-chip" href="{% url 'admin_maintenance_console' %}">Maintenance queue</a>
         <a class="status-chip" href="{% url 'admin_reports_console' %}">Reports console</a>
     </div>
 </div>

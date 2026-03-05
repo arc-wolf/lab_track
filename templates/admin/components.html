@@ -52,11 +52,15 @@
                         <p class="text-muted small mb-0">Total: {{ component.total_stock }}</p>
                         <p class="text-muted small mb-0">Available: <strong>{{ component.available_stock }}</strong></p>
                         <p class="text-muted small mb-0">Student limit: {% if component.student_limit %}{{ component.student_limit }}{% else %}No limit{% endif %}</p>
+                        <p class="text-muted small mb-0">Overdue/day fine: {% if component.fine_per_day != None %}INR {{ component.fine_per_day }}{% else %}Global policy{% endif %}</p>
                     </div>
                     <span class="badge {% if component.available_stock|default:0 <= 2 %}bg-danger{% else %}bg-light text-dark{% endif %}">
                         {{ component.available_stock }} left
                     </span>
                 </div>
+                {% if component.available_stock == 0 %}
+                <div class="out-of-stock-chip"><i class="bi bi-exclamation-triangle-fill"></i>Unavailable for borrowing</div>
+                {% endif %}
                 <div class="mt-auto d-flex gap-2">
                     <a class="btn btn-sm btn-secondary w-50" href="{% url 'admin_component_edit' component.id %}">Edit</a>
                     <a class="btn btn-sm btn-danger w-50" href="{% url 'admin_component_delete' component.id %}">Delete</a>

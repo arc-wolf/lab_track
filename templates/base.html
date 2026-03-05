@@ -43,6 +43,8 @@
             --btn-secondary-bg: #e5e7eb;
             --btn-secondary-fg: #111827;
             --btn-secondary-border: #d1d5db;
+            --modal-bg: #ffffff;
+            --modal-fg: #111827;
         }
 
         /* Dark mode palette */
@@ -70,6 +72,8 @@
             --btn-secondary-bg: rgba(255, 255, 255, 0.1);
             --btn-secondary-fg: #edf2ff;
             --btn-secondary-border: rgba(255, 255, 255, 0.22);
+            --modal-bg: #111827;
+            --modal-fg: #edf2ff;
         }
 
         * { font-family: "Space Grotesk", "Segoe UI", system-ui, -apple-system, sans-serif; letter-spacing: 0.01em; }
@@ -241,6 +245,16 @@
             color: var(--text);
             border-color: var(--btn-secondary-border);
         }
+        .btn-outline-secondary {
+            border-color: var(--btn-secondary-border);
+            color: var(--text);
+            background: transparent;
+        }
+        .btn-outline-secondary:hover {
+            background: var(--btn-secondary-bg);
+            color: var(--text);
+            border-color: var(--btn-secondary-border);
+        }
         .btn-outline-light {
             border-color: rgba(255, 255, 255, 0.55);
             color: #fff;
@@ -272,6 +286,14 @@
         }
         .table tbody tr {
             background: var(--table-row);
+        }
+        .badge.bg-light {
+            background: rgba(255, 255, 255, 0.86) !important;
+            color: #111827 !important;
+        }
+        :root[data-theme="dark"] .badge.bg-light {
+            background: rgba(255, 255, 255, 0.22) !important;
+            color: #f8fafc !important;
         }
         .badge-pill {
             border-radius: 999px;
@@ -332,6 +354,32 @@
             border-radius: 18px;
             overflow: hidden;
             border: 1px solid var(--glass-stroke);
+        }
+        .actions-stack {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            align-items: center;
+        }
+        .out-of-stock-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            background: #b91c1c;
+            color: #fff;
+            border-radius: 999px;
+            padding: 0.25rem 0.65rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+            letter-spacing: 0.02em;
+        }
+        .modal-content {
+            background: var(--modal-bg);
+            color: var(--modal-fg);
+            border: 1px solid var(--glass-stroke);
+        }
+        .modal .text-muted {
+            color: var(--muted) !important;
         }
     </style>
 </head>

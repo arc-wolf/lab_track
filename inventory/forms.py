@@ -6,7 +6,18 @@ from .models import Component
 class ComponentForm(forms.ModelForm):
     class Meta:
         model = Component
-        fields = ["name", "category", "total_stock", "available_stock", "student_limit", "faculty_limit"]
+        fields = [
+            "name",
+            "category",
+            "total_stock",
+            "available_stock",
+            "student_limit",
+            "faculty_limit",
+            "fine_per_day",
+            "fine_damaged",
+            "fine_missing_parts",
+            "fine_not_working",
+        ]
         widgets = {
             "name": forms.TextInput(attrs={"class": "form-control"}),
             "category": forms.TextInput(attrs={"class": "form-control"}),
@@ -14,6 +25,10 @@ class ComponentForm(forms.ModelForm):
             "available_stock": forms.NumberInput(attrs={"class": "form-control", "min": 0}),
             "student_limit": forms.NumberInput(attrs={"class": "form-control", "min": 0}),
             "faculty_limit": forms.NumberInput(attrs={"class": "form-control", "min": 0}),
+            "fine_per_day": forms.NumberInput(attrs={"class": "form-control", "min": 0}),
+            "fine_damaged": forms.NumberInput(attrs={"class": "form-control", "min": 0}),
+            "fine_missing_parts": forms.NumberInput(attrs={"class": "form-control", "min": 0}),
+            "fine_not_working": forms.NumberInput(attrs={"class": "form-control", "min": 0}),
         }
 
     def clean(self):

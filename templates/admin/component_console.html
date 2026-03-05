@@ -11,42 +11,74 @@
         <div class="d-flex gap-2 flex-wrap">
             <a href="{% url 'admin_dashboard' %}" class="btn btn-outline-secondary">Back to Admin Dashboard</a>
             <a href="{% url 'admin_components' %}" class="btn btn-primary">Open Stock Console</a>
+            <a href="{% url 'admin_maintenance_console' %}" class="btn btn-outline-primary">Open Maintenance Queue</a>
         </div>
     </div>
 </section>
 
+<div class="row g-3 mb-3">
+    <div class="col-md-4">
+        <div class="glass-panel p-3 h-100">
+            <div class="hero-eyebrow small text-muted">Step 1</div>
+            <h6 class="mb-1">Set penalty rules</h6>
+            <p class="small text-muted mb-0">Configure overdue and return-condition fines used by operations.</p>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="glass-panel p-3 h-100">
+            <div class="hero-eyebrow small text-muted">Step 2</div>
+            <h6 class="mb-1">Set maintenance triggers</h6>
+            <p class="small text-muted mb-0">Define condition keywords that automatically flag service risk.</p>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="glass-panel p-3 h-100">
+            <div class="hero-eyebrow small text-muted">Step 3</div>
+            <h6 class="mb-1">Review component limits</h6>
+            <p class="small text-muted mb-0">Keep student/faculty limits and stock aligned with lab capacity.</p>
+        </div>
+    </div>
+</div>
+
 <div class="glass-panel p-4 mb-3">
-    <form method="post" class="row g-2 mb-3">
+    <form method="post" class="row g-3 mb-3">
         {% csrf_token %}
-        <div class="col-md-2">
+        <div class="col-12">
+            <div class="hero-eyebrow">A. Penalty Parameters</div>
+        </div>
+        <div class="col-md-3">
             <label class="form-label small text-muted">Per-day fine</label>
             <input type="number" min="0" class="form-control" name="per_day_fine" value="{{ policy.per_day_fine }}">
         </div>
-        <div class="col-md-2">
+        <div class="col-md-3">
             <label class="form-label small text-muted">Grace days</label>
             <input type="number" min="0" class="form-control" name="grace_days" value="{{ policy.grace_days }}">
         </div>
-        <div class="col-md-2">
+        <div class="col-md-3">
             <label class="form-label small text-muted">Penalty trigger days</label>
             <input type="number" min="0" class="form-control" name="overdue_penalty_trigger_days" value="{{ policy.overdue_penalty_trigger_days }}">
         </div>
-        <div class="col-md-2">
+        <div class="col-md-3">
             <label class="form-label small text-muted">Damaged fine</label>
             <input type="number" min="0" class="form-control" name="damaged_fine" value="{{ policy.damaged_fine }}">
         </div>
-        <div class="col-md-2">
+        <div class="col-md-4">
             <label class="form-label small text-muted">Missing parts fine</label>
             <input type="number" min="0" class="form-control" name="missing_parts_fine" value="{{ policy.missing_parts_fine }}">
         </div>
-        <div class="col-md-2">
+        <div class="col-md-4">
             <label class="form-label small text-muted">Not working fine</label>
             <input type="number" min="0" class="form-control" name="not_working_fine" value="{{ policy.not_working_fine }}">
         </div>
-        <div class="col-md-6">
+        <div class="col-12">
+            <div class="hero-eyebrow">B. Maintenance Triggers</div>
+        </div>
+        <div class="col-md-8">
             <label class="form-label small text-muted">Maintenance trigger keywords (comma separated)</label>
             <input type="text" class="form-control" name="maintenance_keywords" value="{{ policy.maintenance_keywords }}">
+            <small class="text-muted">Example: service, damaged, not working, missing</small>
         </div>
-        <div class="col-md-6">
+        <div class="col-md-4">
             <label class="form-label small text-muted">Policy notes</label>
             <input type="text" class="form-control" name="notes" value="{{ policy.notes }}">
         </div>
@@ -54,6 +86,15 @@
             <button class="btn btn-primary">Save Policy Parameters</button>
         </div>
     </form>
+
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+        <div>
+            <div class="hero-eyebrow">C. Component Limit Review</div>
+            <h6 class="mb-0">Check limits and stock readiness</h6>
+        </div>
+        <a href="{% url 'admin_components' %}" class="btn btn-sm btn-outline-primary">Open Full Inventory Console</a>
+    </div>
+
     <div class="table-responsive neo-table">
         <table class="table align-middle mb-0 table-hover">
             <thead>
@@ -62,6 +103,7 @@
                     <th>Category</th>
                     <th>Student Limit</th>
                     <th>Faculty Limit</th>
+                    <th>Fine Overrides</th>
                     <th>Available</th>
                     <th>Total (admin only)</th>
                     <th>Actions</th>
@@ -74,17 +116,23 @@
                     <td>{{ component.category|default:"—" }}</td>
                     <td>{{ component.student_limit|default:"No limit" }}</td>
                     <td>{{ component.faculty_limit|default:"No limit" }}</td>
+                    <td class="small">
+                        Day: {% if component.fine_per_day != None %}{{ component.fine_per_day }}{% else %}Global{% endif %}<br>
+                        Damaged: {% if component.fine_damaged != None %}{{ component.fine_damaged }}{% else %}Global{% endif %}<br>
+                        Missing: {% if component.fine_missing_parts != None %}{{ component.fine_missing_parts }}{% else %}Global{% endif %}<br>
+                        Not Working: {% if component.fine_not_working != None %}{{ component.fine_not_working }}{% else %}Global{% endif %}
+                    </td>
                     <td>{{ component.available_stock }}</td>
                     <td>{{ component.total_stock }}</td>
                     <td>
                         <div class="d-flex flex-wrap gap-2">
                             <a href="{% url 'admin_component_edit' component.id %}" class="btn btn-sm btn-outline-primary">Edit</a>
-                            <a href="{% url 'admin_maintenance_queue' %}" class="btn btn-sm btn-outline-secondary">Send to maintenance queue</a>
+                            <a href="{% url 'admin_maintenance_console' %}" class="btn btn-sm btn-primary">Send to maintenance queue</a>
                         </div>
                     </td>
                 </tr>
                 {% empty %}
-                <tr><td colspan="7">No components configured.</td></tr>
+                <tr><td colspan="8">No components configured.</td></tr>
                 {% endfor %}
             </tbody>
         </table>

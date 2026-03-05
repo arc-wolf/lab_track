@@ -29,6 +29,7 @@ class Profile(models.Model):
     group_id = models.CharField(max_length=50, blank=True, db_index=True)
     group_name = models.CharField(max_length=100, blank=True)
     phone = models.CharField(max_length=20, blank=True)
+    email_locked = models.BooleanField(default=False)
     faculty_incharge = models.CharField(max_length=100, blank=True)
     full_name = models.CharField(max_length=150, blank=True)
 
@@ -139,9 +140,11 @@ class GroupRemovalRequest(models.Model):
 class EmailOTP(models.Model):
     PURPOSE_SIGNUP = "SIGNUP"
     PURPOSE_PASSWORD_RESET = "PASSWORD_RESET"
+    PURPOSE_ADMIN_EMAIL_CHANGE = "ADMIN_EMAIL_CHANGE"
     PURPOSE_CHOICES = [
         (PURPOSE_SIGNUP, "Signup"),
         (PURPOSE_PASSWORD_RESET, "Password Reset"),
+        (PURPOSE_ADMIN_EMAIL_CHANGE, "Admin Email Change"),
     ]
 
     email = models.EmailField(db_index=True)

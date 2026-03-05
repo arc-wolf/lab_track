@@ -72,6 +72,67 @@
                     {{ form.faculty_limit.errors }}
                 </div>
             </div>
+
+            <div class="col-12">
+                <div class="hero-eyebrow">Per-Component Fine Overrides</div>
+                <p class="small text-muted mb-0">Leave blank to use global policy values from Policy Console.</p>
+            </div>
+
+            <div class="col-md-6">
+                <div class="p-3 rounded-3 border border-0 shadow-sm h-100" style="background: rgba(255,255,255,0.04);">
+                    <label class="form-label d-flex justify-content-between">
+                        <span>Overdue Fine (per day)</span>
+                        <span class="badge bg-warning text-dark">Optional</span>
+                    </label>
+                    <div class="input-group">
+                        <span class="input-group-text">INR</span>
+                        {{ form.fine_per_day }}
+                    </div>
+                    {{ form.fine_per_day.errors }}
+                </div>
+            </div>
+
+            <div class="col-md-6">
+                <div class="p-3 rounded-3 border border-0 shadow-sm h-100" style="background: rgba(255,255,255,0.04);">
+                    <label class="form-label d-flex justify-content-between">
+                        <span>Damaged Fine</span>
+                        <span class="badge bg-warning text-dark">Optional</span>
+                    </label>
+                    <div class="input-group">
+                        <span class="input-group-text">INR</span>
+                        {{ form.fine_damaged }}
+                    </div>
+                    {{ form.fine_damaged.errors }}
+                </div>
+            </div>
+
+            <div class="col-md-6">
+                <div class="p-3 rounded-3 border border-0 shadow-sm h-100" style="background: rgba(255,255,255,0.04);">
+                    <label class="form-label d-flex justify-content-between">
+                        <span>Missing Parts Fine</span>
+                        <span class="badge bg-warning text-dark">Optional</span>
+                    </label>
+                    <div class="input-group">
+                        <span class="input-group-text">INR</span>
+                        {{ form.fine_missing_parts }}
+                    </div>
+                    {{ form.fine_missing_parts.errors }}
+                </div>
+            </div>
+
+            <div class="col-md-6">
+                <div class="p-3 rounded-3 border border-0 shadow-sm h-100" style="background: rgba(255,255,255,0.04);">
+                    <label class="form-label d-flex justify-content-between">
+                        <span>Not Working Fine</span>
+                        <span class="badge bg-warning text-dark">Optional</span>
+                    </label>
+                    <div class="input-group">
+                        <span class="input-group-text">INR</span>
+                        {{ form.fine_not_working }}
+                    </div>
+                    {{ form.fine_not_working.errors }}
+                </div>
+            </div>
         </div>
         <div class="mt-4 d-flex gap-2">
             <button class="btn btn-primary">Save</button>

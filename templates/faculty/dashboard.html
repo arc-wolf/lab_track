@@ -5,7 +5,7 @@
     <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
         <div>
             <div class="hero-eyebrow mb-1">Faculty Desk</div>
-            <h3 class="mb-1 fw-bold">Student Requests Under You</h3>
+            <h3 class="mb-1 fw-bold">Borrow Requests Under You</h3>
             <p class="text-muted mb-0">Approve slips, track due dates, and keep teams moving.</p>
         </div>
         <div class="d-flex gap-2 flex-wrap">
@@ -76,7 +76,7 @@
             <label class="form-label small text-muted">Search</label>
             <div class="input-group">
                 <span class="input-group-text bg-transparent text-muted"><i class="bi bi-search"></i></span>
-                <input type="text" name="q" value="{{ search_query }}" class="form-control" placeholder="Slip #, student, or group">
+                <input type="text" name="q" value="{{ search_query }}" class="form-control" placeholder="Slip #, requester, or group">
             </div>
         </div>
         <div class="col-md-3">
@@ -100,7 +100,7 @@
                 <option value="due_asc" {% if sort_key == 'due_asc' %}selected{% endif %}>Due date ↑</option>
                 <option value="due_desc" {% if sort_key == 'due_desc' %}selected{% endif %}>Due date ↓</option>
                 <option value="status" {% if sort_key == 'status' %}selected{% endif %}>Status</option>
-                <option value="student" {% if sort_key == 'student' %}selected{% endif %}>Student</option>
+                <option value="student" {% if sort_key == 'student' %}selected{% endif %}>Requester</option>
                 <option value="group" {% if sort_key == 'group' %}selected{% endif %}>Group</option>
             </select>
         </div>
@@ -122,7 +122,8 @@
             <thead>
                 <tr>
                     <th>Slip</th>
-                    <th>Student</th>
+                    <th>Requester</th>
+                    <th>Role</th>
                     <th>Group</th>
                     <th>Status</th>
                     <th>Items</th>
@@ -136,6 +137,13 @@
                 <tr>
                     <td class="fw-semibold">#{{ slip.id }}</td>
                     <td>{{ slip.user.username }}</td>
+                    <td>
+                        {% if slip.user.profile.role == 'faculty' %}
+                            <span class="badge bg-info text-dark">Faculty</span>
+                        {% else %}
+                            <span class="badge bg-secondary">Student</span>
+                        {% endif %}
+                    </td>
                     <td>
                         {% if slip.group %}
                             {{ slip.group.code }}{% if slip.group.name %} • {{ slip.group.name }}{% endif %}
@@ -168,9 +176,21 @@
                     <td>{{ slip.due_date|date:"M j, Y"|default:"—" }}</td>
                     <td>
                         {% if slip.status == 'PENDING' %}
-                        <form method="post" action="{% url 'approve_slip' slip.id %}">
-                            {% csrf_token %}<button class="btn btn-success btn-sm">Approve</button>
-                        </form>
+                        <div class="actions-stack">
+                            <form method="post" action="{% url 'approve_slip' slip.id %}">
+                                {% csrf_token %}<button class="btn btn-success btn-sm">Approve</button>
+                            </form>
+                            <button
+                                type="button"
+                                class="btn btn-danger btn-sm reject-btn"
+                                data-bs-toggle="modal"
+                                data-bs-target="#rejectModal"
+                                data-reject-url="{% url 'terminate_slip' slip.id %}"
+                                data-slip="#{{ slip.id }}"
+                            >
+                                Reject
+                            </button>
+                        </div>
                         {% else %}
                         <a href="{% url 'download_slip' slip.id %}" class="btn btn-outline-primary btn-sm">PDF</a>
                         {% endif %}
@@ -180,7 +200,7 @@
                     </td>
                 </tr>
                 <tr class="collapse" id="details-{{ slip.id }}">
-                    <td colspan="8" class="bg-transparent">
+                    <td colspan="9" class="bg-transparent">
                         <div class="frosted p-3 rounded-3">
                             <div class="d-flex flex-wrap justify-content-between gap-3">
                                 <div>
@@ -233,7 +253,7 @@
                     </td>
                 </tr>
                 {% empty %}
-                <tr><td colspan="8">No matching borrow requests.</td></tr>
+                <tr><td colspan="9">No matching borrow requests.</td></tr>
                 {% endfor %}
             </tbody>
         </table>
@@ -254,5 +274,52 @@
     </nav>
     {% endif %}
 </div>
+
+<div class="modal fade" id="rejectModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header border-0">
+        <h5 class="modal-title">Reject Request</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form method="post" id="rejectForm">
+        {% csrf_token %}
+        <div class="modal-body">
+          <p class="small text-muted mb-2" id="rejectSlipLabel"></p>
+          <label for="rejectNote" class="form-label">Reason / remarks</label>
+          <textarea id="rejectNote" name="reject_note" class="form-control" rows="3" placeholder="Add a clear reason for rejection" required></textarea>
+        </div>
+        <div class="modal-footer border-0">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-danger">Reject Request</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+    const rejectModal = document.getElementById("rejectModal");
+    const rejectForm = document.getElementById("rejectForm");
+    const rejectLabel = document.getElementById("rejectSlipLabel");
+    const rejectNote = document.getElementById("rejectNote");
+
+    const setRejectTarget = (button) => {
+        if (!button || !rejectForm) return;
+        rejectForm.action = button.getAttribute("data-reject-url");
+        if (rejectLabel) rejectLabel.textContent = `Provide remarks for slip ${button.getAttribute("data-slip")}`;
+        if (rejectNote) rejectNote.value = "";
+    };
+
+    document.querySelectorAll(".reject-btn").forEach((btn) => {
+        btn.addEventListener("click", () => setRejectTarget(btn));
+    });
+
+    rejectModal?.addEventListener("show.bs.modal", (event) => {
+        setRejectTarget(event.relatedTarget);
+    });
+});
+</script>
 
 {% endblock %}

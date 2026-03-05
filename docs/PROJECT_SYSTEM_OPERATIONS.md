@@ -1,6 +1,6 @@
 # LabTrack Project System Operations (Living Document)
 
-Last updated: March 3, 2026
+Last updated: March 5, 2026
 Owner: Engineering team
 
 ## 1) Purpose
@@ -47,7 +47,7 @@ This file must be updated on every functional code change.
   - `create group`: generates unique Group ID.
   - `join group`: case-insensitive group code validation and normalization.
 - Student `Faculty Incharge` is restricted to select-only from registered faculty list.
-- Phone numbers are validated to allow only 10-15 digits with optional leading `+`.
+- Phone numbers are normalized and validated as India 10-digit mobile numbers.
 - Full name is mandatory in signup for both students and faculty.
 - Admin seed account:
   - Username: `lab_admin`
@@ -94,31 +94,47 @@ This file must be updated on every functional code change.
 - Faculty dashboard:
   - Filters, search, sort, pagination.
   - Sees assigned requests and request details.
+  - Clearly labels requester role (`Student` or `Faculty`) in queue rows.
   - Approves pending slips assigned to them.
+  - Rejects pending assigned slips via modal with mandatory remarks.
 - Faculty groups page:
   - Sees assigned groups.
   - Approves/rejects pending groups.
 - Faculty profile console:
-  - Update full name, phone, email, password.
+  - Update full name, username, phone, password.
+  - Verified faculty email is immutable (locked).
 
 ### 4.6 Admin Operations (Lab Admin)
-Lab Admin has four operational consoles plus profile:
+Lab Admin has an overview dashboard plus dedicated operational consoles:
+
+0. Admin Dashboard (`requests/admin/`)
+- Overview-only page (glimpse cards + latest requests preview).
+- Does not contain full queue controls; it links into dedicated consoles.
+- Shows a priority-sorted action inbox (pending approvals, overdue/penalty, pending groups, low stock, maintenance flags).
+- Prioritization logic is count-driven and intended to surface high-impact actions first.
 
 1. Stock Console (`admin/components`)
 - Component CRUD with:
   - `total_stock` (real total count)
   - `available_stock` (visible/borrowable count)
   - `student_limit` and `faculty_limit` enforcement values
+  - optional per-component fine overrides:
+    - `fine_per_day`
+    - `fine_damaged`
+    - `fine_missing_parts`
+    - `fine_not_working`
 - Search + category filter + stock-state filter (`low`, `out`).
 
-2. Request Console (`requests/admin`)
+2. Request Console (`requests/admin/requests`)
 - Unified queue for all requests.
+- Contains one-click quick filters for `PENDING`, `OVERDUE`, `PENALTY`, and `APPROVED`.
 - Admin actions:
   - Approve
-  - Reject/Terminate
+  - Reject/Terminate with remark capture (modal text field)
   - Mark Collected (`ISSUED`) with mandatory collector name entry
   - Mark Penalty
   - Mark Returned + condition logging
+- Queue now shows requester identity and requester role separately to avoid misclassification.
 - Detail panel includes:
   - Group info
   - Cart lock time (`cart_locked_at`)
@@ -128,7 +144,7 @@ Lab Admin has four operational consoles plus profile:
   - Action history
 - UI shows toast notifications for errors/warnings/success events instead of basic inline alerts.
 
-3. Component Data Console (`requests/admin/data-console`)
+3. Component Data Console (`requests/admin/analytics`)
 - Analytics dashboard with:
   - KPI cards (pending/issued/returned/penalty/overdue/etc.)
   - Chart visualization (collected vs returned vs penalized)
@@ -146,11 +162,16 @@ Lab Admin has four operational consoles plus profile:
   - `not_working_fine`
   - `maintenance_keywords`
   - `notes`
+- Global defaults apply when a component fine override is not set.
 
 Additional admin consoles:
-- Maintenance Queue (`requests/admin/maintenance-queue`)
+- Maintenance Queue (`requests/admin/maintenance`)
 - Reports Console (`requests/admin/reports-console`)
 - Admin Profile Console (`users/admin/profile-console`)
+  - Admin can edit username/full name/phone/password.
+  - Admin email is editable only before verification lock.
+  - Email change requires OTP sent to the new email.
+  - After OTP verification, admin email becomes locked.
 
 ### 4.7 Borrow Lifecycle and Stock Behavior
 Request statuses:
@@ -163,6 +184,9 @@ Operational behavior:
 - `RETURNED` restores stock and logs return condition.
 - `REJECTED` restores stock.
 - All status transitions are audit-logged in `BorrowAction`.
+- Penalty estimation now supports component-specific fine structure:
+  - overdue estimate uses component `fine_per_day` if set, else global `per_day_fine`.
+  - return-condition estimate (damaged/missing/not-working) uses component overrides if set, else global policy values.
 
 Due policy:
 - Default due date is now 45 days from request creation when due is not explicitly set.
@@ -202,6 +226,12 @@ Due policy:
 - API serialization layer:
   - Response payloads are centralized in `api/serializers.py`.
   - `api/views.py` now delegates JSON shape construction to serializer helpers.
+- Admin operational API routes:
+  - `GET /api/admin/overview/` -> dashboard glimpse payload for admin clients.
+  - `GET /api/admin/console-map/` -> canonical web console URL map for admin navigation.
+  - `GET /api/admin/policy/` -> read global policy values.
+  - `POST /api/admin/policy/update/` -> update global policy values.
+  - `POST /api/admin/components/<id>/fines/` -> update component fine overrides.
 
 ### 4.11 Recent Stability/Performance Fixes
 - Signup UX fix:
@@ -216,6 +246,36 @@ Due policy:
   - Added gzip middleware for compressed responses.
   - Added targeted DB indexes on high-traffic query paths (`BorrowRequest`, `BorrowAction`, `BorrowItem`, `Profile`, `Group`, `GroupMember`, `GroupRemovalRequest`).
   - Reduced repeated DB lookups in faculty resolution logic and cached component category list for dashboard rendering.
+
+### 4.12 Recent UX and Validation Updates (March 5, 2026)
+- Reject-flow hardening:
+  - Admin and faculty now reject through modal with explicit rejection remarks.
+  - Backend accepts role-aware rejection (`admin` for any request, `faculty` only assigned requests).
+- Role clarity updates:
+  - Request queues renamed to use `Requester` labels instead of assuming all are students.
+  - API payload now includes `requester_role` and `requester` in request serialization.
+- Theme readability fixes:
+  - Improved dark/light contrast for outline buttons, badges, and modals.
+  - Removed history-based auth back buttons to avoid inconsistent navigation context.
+- Stock visibility clarity:
+  - Added explicit out-of-stock denoters in student and admin component views.
+- Profile hardening:
+  - Username is editable in profile consoles but must remain unique across all users.
+  - Full name now accepts alphabet + space only.
+  - Student/faculty emails are immutable after verification (locked).
+  - Admin email changes require OTP verification and lock after success.
+  - Profile phone validation is enforced as India 10-digit mobile number.
+
+### 4.13 Admin Decision Logic Refinement (March 5, 2026)
+- Admin dashboard context now computes operational priorities centrally:
+  - request pressure (`pending`, `overdue`, `penalty`)
+  - pending group workload
+  - stock risk and maintenance risk counts
+- Quick-request glimpse now prefers urgent states first (`PENDING`, `OVERDUE`, `PENALTY`) before filling with latest activity.
+- Admin overview API (`/api/admin/overview/`) mirrors this logic by returning:
+  - `pending_groups_count`
+  - `priority_items`
+  - updated `stats` + `latest_requests`
 
 ## 5) Data Model Additions/Alterations
 - `requests_app.BorrowRequest`
@@ -240,11 +300,15 @@ Due policy:
   - `/users/groups/` -> faculty group approvals
   - `/users/faculty/profile-console/` -> faculty profile
 - Admin:
-  - `/requests/admin/` -> request console
+  - `/requests/admin/` -> overview dashboard (glimpse)
+  - `/requests/admin/requests/` -> request console
+  - `/requests/admin/request-console/` -> legacy alias to request console
   - `/inventory/admin/components/` -> stock console
   - `/requests/admin/component-console/` -> policy console
-  - `/requests/admin/data-console/` -> analytics console
-  - `/requests/admin/maintenance-queue/` -> maintenance queue
+  - `/requests/admin/analytics/` -> analytics console
+  - `/requests/admin/data-console/` -> legacy alias to analytics console
+  - `/requests/admin/maintenance/` -> maintenance queue
+  - `/requests/admin/maintenance-queue/` -> legacy alias to maintenance queue
   - `/requests/admin/reports-console/` -> reports
   - `/users/admin/profile-console/` -> admin profile
 - Auth/Recovery:
@@ -311,6 +375,11 @@ Whenever any functionality changes:
   - Action required: configure shared cache (e.g., Redis) for production.
 
 ## 10) Change Log (append-only, newest first)
+- 2026-03-05: Hardened profile integrity across roles: unique editable username, alphabet-only full name, India 10-digit phone validation, student/faculty email lock after verification, and admin email-change OTP flow with post-verify lock.
+- 2026-03-05: Added admin write APIs for policy and per-component fine overrides (`/api/admin/policy/`, `/api/admin/policy/update/`, `/api/admin/components/<id>/fines/`) and updated API tests/docs.
+- 2026-03-05: Refined lab-admin decision logic (priority inbox + urgent-first glimpse) and aligned `/api/admin/overview/` payload with new operational fields (`pending_groups_count`, `priority_items`).
+- 2026-03-05: Added per-component fine overrides (`fine_per_day`, `fine_damaged`, `fine_missing_parts`, `fine_not_working`), wired penalty estimation to use component overrides with global fallback, and updated admin component forms/views/API serialization/docs.
+- 2026-03-05: Split admin UX into overview-only dashboard + dedicated request console page, added canonical admin routes (`/requests/admin/requests`, `/requests/admin/analytics`, `/requests/admin/maintenance`) with legacy aliases, and added admin API routes (`/api/admin/overview`, `/api/admin/console-map`).
 - 2026-03-04: Added `docs/API_POSTMAN_TESTING.md` and inline API endpoint comments in `api/urls.py` for faster Postman-based validation.
 - 2026-03-04: Added beginner-friendly `docs/TUTORIAL.md` and linked it from project docs for onboarding from zero programming background.
 - 2026-03-04: Added production-efficiency hardening (cache backend config, DB connection reuse, gzip middleware, query/index optimization, and hot-path caching).

@@ -50,7 +50,7 @@
                     <h5 class="mb-1">Borrow Requests</h5>
                     <p class="text-muted small mb-0">View every borrow request by every group.</p>
                 </div>
-                <a href="{% url 'admin_dashboard' %}#permission-console" class="btn btn-outline-primary">Queue</a>
+                <a href="{% url 'admin_requests_console' %}" class="btn btn-outline-primary">Queue</a>
             </div>
             <div class="d-flex gap-3 align-items-center">
                 <div>
@@ -79,7 +79,7 @@
     </div>
     <div class="d-flex flex-wrap gap-2">
         <a class="status-chip" href="{% url 'admin_groups' %}">Review group submissions</a>
-        <a class="status-chip" href="{% url 'admin_dashboard' %}#permission-console">Process borrow permissions</a>
+        <a class="status-chip" href="{% url 'admin_requests_console' %}">Process borrow permissions</a>
         <a class="status-chip" href="{% url 'admin_components' %}">Check stock before approval</a>
         <a class="status-chip" href="{% url 'admin_reports_console' %}">Reports Console</a>
     </div>

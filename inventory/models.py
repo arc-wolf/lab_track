@@ -10,6 +10,11 @@ class Component(models.Model):
     available_stock = models.PositiveIntegerField(default=0)
     student_limit = models.PositiveIntegerField(default=0)  # 0 = no limit
     faculty_limit = models.PositiveIntegerField(default=0)  # reserved for future faculty requests
+    # Optional per-component fine overrides. Null => fallback to global LabPolicy.
+    fine_per_day = models.PositiveIntegerField(null=True, blank=True)
+    fine_damaged = models.PositiveIntegerField(null=True, blank=True)
+    fine_missing_parts = models.PositiveIntegerField(null=True, blank=True)
+    fine_not_working = models.PositiveIntegerField(null=True, blank=True)
 
     def __str__(self):
         return self.name

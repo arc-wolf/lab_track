@@ -9,6 +9,7 @@ from django.core.paginator import Paginator
 from django.db.models import Count, Q, Sum
 from django.shortcuts import get_object_or_404, redirect, render
 from django.conf import settings
+from django.utils import timezone
 
 from inventory.models import Component
 from users.models import Profile
@@ -29,6 +30,95 @@ from .utils import generate_borrow_slip_pdf
 def _require_role(user, role):
     profile = getattr(user, "profile", None)
     return profile and profile.role == role
+
+
+def _build_admin_overview_context():
+    stats = BorrowRequest.objects.aggregate(
+        pending=Count("id", filter=Q(status=BorrowRequest.STATUS_PENDING)),
+        approved=Count("id", filter=Q(status=BorrowRequest.STATUS_APPROVED)),
+        issued=Count("id", filter=Q(status=BorrowRequest.STATUS_ISSUED)),
+        penalty=Count("id", filter=Q(status=BorrowRequest.STATUS_PENALTY)),
+        overdue=Count("id", filter=Q(status=BorrowRequest.STATUS_OVERDUE)),
+        returned=Count("id", filter=Q(status=BorrowRequest.STATUS_RETURNED)),
+        rejected=Count("id", filter=Q(status=BorrowRequest.STATUS_REJECTED)),
+    )
+
+    pending_groups = Group.objects.filter(status=Group.STATUS_PENDING).count()
+    low_stock_count = Component.objects.filter(available_stock__lte=2).count()
+
+    maintenance_keyword_filter = (
+        Q(borrow_request__return_condition__icontains="service")
+        | Q(borrow_request__return_condition__icontains="damaged")
+        | Q(borrow_request__return_condition__icontains="not working")
+        | Q(borrow_request__return_condition__icontains="missing")
+    )
+    maintenance_count = BorrowItem.objects.filter(
+        borrow_request__status=BorrowRequest.STATUS_RETURNED,
+    ).filter(maintenance_keyword_filter).count()
+
+    priority_items = [
+        {
+            "label": "Pending Approvals",
+            "count": stats.get("pending", 0),
+            "href": "admin_requests_console",
+            "query": "status=PENDING",
+            "severity": "high" if stats.get("pending", 0) > 0 else "ok",
+        },
+        {
+            "label": "Overdue/Penalty",
+            "count": (stats.get("overdue", 0) or 0) + (stats.get("penalty", 0) or 0),
+            "href": "admin_requests_console",
+            "query": "status=OVERDUE",
+            "severity": "high" if ((stats.get("overdue", 0) or 0) + (stats.get("penalty", 0) or 0)) > 0 else "ok",
+        },
+        {
+            "label": "Pending Groups",
+            "count": pending_groups,
+            "href": "admin_groups",
+            "query": "",
+            "severity": "high" if pending_groups > 0 else "ok",
+        },
+        {
+            "label": "Low Stock",
+            "count": low_stock_count,
+            "href": "admin_components",
+            "query": "stock=low",
+            "severity": "warn" if low_stock_count > 0 else "ok",
+        },
+        {
+            "label": "Maintenance Flags",
+            "count": maintenance_count,
+            "href": "admin_maintenance_console",
+            "query": "",
+            "severity": "warn" if maintenance_count > 0 else "ok",
+        },
+    ]
+    priority_items = sorted(priority_items, key=lambda row: (row["count"] == 0, -row["count"]))
+
+    urgent_qs = (
+        BorrowRequest.objects.filter(status__in=[BorrowRequest.STATUS_PENDING, BorrowRequest.STATUS_OVERDUE, BorrowRequest.STATUS_PENALTY])
+        .select_related("user", "faculty", "group")
+        .prefetch_related("items__component")
+        .order_by("due_date", "-created_at")[:6]
+    )
+    urgent_ids = [row.id for row in urgent_qs]
+    remaining_slots = max(0, 6 - len(urgent_ids))
+    latest_qs = (
+        BorrowRequest.objects.exclude(id__in=urgent_ids)
+        .select_related("user", "faculty", "group")
+        .prefetch_related("items__component")
+        .order_by("-created_at")[:remaining_slots]
+    )
+    quick_requests = list(urgent_qs) + list(latest_qs)
+
+    return {
+        "stats": stats,
+        "quick_requests": quick_requests,
+        "low_stock_count": low_stock_count,
+        "maintenance_count": maintenance_count,
+        "pending_groups_count": pending_groups,
+        "priority_items": priority_items,
+    }
 
 
 def _notify_return(borrow_request: BorrowRequest):
@@ -63,6 +153,55 @@ def _notify_return(borrow_request: BorrowRequest):
     )
 
 
+def _component_or_global_fine(component: Component, policy: LabPolicy, component_field: str, policy_field: str) -> int:
+    override = getattr(component, component_field, None)
+    if override is not None:
+        return int(override)
+    return int(getattr(policy, policy_field, 0) or 0)
+
+
+def _calculate_overdue_penalty_estimate(borrow_request: BorrowRequest, policy: LabPolicy):
+    due = borrow_request.due_date
+    if not due:
+        return 0, 0, []
+    overdue_days = max(0, (timezone.now().date() - due).days - int(policy.grace_days or 0))
+    if overdue_days <= 0:
+        return 0, 0, []
+
+    total = 0
+    breakdown = []
+    for item in borrow_request.items.select_related("component"):
+        rate = _component_or_global_fine(item.component, policy, "fine_per_day", "per_day_fine")
+        line_total = rate * item.quantity * overdue_days
+        total += line_total
+        breakdown.append(f"{item.component.name}: {item.quantity} x {overdue_days}d x INR {rate} = INR {line_total}")
+    return total, overdue_days, breakdown
+
+
+def _calculate_condition_penalty_estimate(borrow_request: BorrowRequest, policy: LabPolicy, condition: str):
+    normalized = (condition or "").strip().lower()
+    if "missing" in normalized:
+        component_field = "fine_missing_parts"
+        policy_field = "missing_parts_fine"
+    elif "not working" in normalized:
+        component_field = "fine_not_working"
+        policy_field = "not_working_fine"
+    elif "damaged" in normalized:
+        component_field = "fine_damaged"
+        policy_field = "damaged_fine"
+    else:
+        return 0, []
+
+    total = 0
+    breakdown = []
+    for item in borrow_request.items.select_related("component"):
+        rate = _component_or_global_fine(item.component, policy, component_field, policy_field)
+        line_total = rate * item.quantity
+        total += line_total
+        breakdown.append(f"{item.component.name}: {item.quantity} x INR {rate} = INR {line_total}")
+    return total, breakdown
+
+
 # ---------------- Dashboards -----------------
 @login_required
 def faculty_dashboard(request):
@@ -81,6 +220,7 @@ def faculty_dashboard(request):
         "due_desc": "-due_date",
         "status": "status",
         "student": "user__username",
+        "group": "group__code",
     }
 
     slips_qs = (
@@ -136,11 +276,7 @@ def faculty_dashboard(request):
 
 
 @login_required
-def admin_dashboard(request):
-    if not _require_role(request.user, Profile.ROLE_ADMIN):
-        messages.error(request, "Only lab admin can access this dashboard.")
-        return redirect("dashboard")
-
+def _build_admin_queue_context(request):
     status_filter = request.GET.get("status", "").upper()
     search_query = request.GET.get("q", "").strip()
     sort_key = request.GET.get("sort", "created_desc")
@@ -184,6 +320,9 @@ def admin_dashboard(request):
     stats = BorrowRequest.objects.aggregate(
         pending=Count("id", filter=Q(status=BorrowRequest.STATUS_PENDING)),
         approved=Count("id", filter=Q(status=BorrowRequest.STATUS_APPROVED)),
+        issued=Count("id", filter=Q(status=BorrowRequest.STATUS_ISSUED)),
+        overdue=Count("id", filter=Q(status=BorrowRequest.STATUS_OVERDUE)),
+        penalty=Count("id", filter=Q(status=BorrowRequest.STATUS_PENALTY)),
         returned=Count("id", filter=Q(status=BorrowRequest.STATUS_RETURNED)),
         rejected=Count("id", filter=Q(status=BorrowRequest.STATUS_REJECTED)),
     )
@@ -191,7 +330,7 @@ def admin_dashboard(request):
     base_query = request.GET.copy()
     base_query.pop("page", None)
 
-    context = {
+    return {
         "page_obj": page_obj,
         "paginator": paginator,
         "status_filter": status_filter,
@@ -204,8 +343,26 @@ def admin_dashboard(request):
         "awaiting_return": stats.get("approved", 0),
         "querystring_base": base_query.urlencode(),
         "page_sizes": [5, 10, 15, 20, 30, 50],
+        "queue_total": paginator.count,
     }
+
+
+@login_required
+def admin_dashboard(request):
+    if not _require_role(request.user, Profile.ROLE_ADMIN):
+        messages.error(request, "Only lab admin can access this dashboard.")
+        return redirect("dashboard")
+
+    context = _build_admin_overview_context()
     return render(request, "admin/dashboard.html", context)
+
+
+@login_required
+def admin_requests_console(request):
+    if not _require_role(request.user, Profile.ROLE_ADMIN):
+        messages.error(request, "Only lab admin can access request console.")
+        return redirect("dashboard")
+    return render(request, "admin/request_console.html", _build_admin_queue_context(request))
 
 
 @login_required
@@ -601,46 +758,61 @@ def terminate_slip(request, request_id):
     if request.method != "POST":
         messages.error(request, "Invalid request method.")
         return redirect("admin_dashboard")
-    if not _require_role(request.user, Profile.ROLE_ADMIN):
-        messages.error(request, "Only lab admin can reject slips.")
+    role = getattr(getattr(request.user, "profile", None), "role", None)
+    if role not in (Profile.ROLE_ADMIN, Profile.ROLE_FACULTY):
+        messages.error(request, "You are not authorized to reject slips.")
         return redirect("dashboard")
-
     borrow_request = get_object_or_404(BorrowRequest, id=request_id)
+    if role == Profile.ROLE_FACULTY and borrow_request.faculty != request.user:
+        messages.error(request, "You can reject only requests assigned to you.")
+        return redirect("faculty_dashboard")
+    note = request.POST.get("reject_note", "").strip()
+    if not note:
+        note = "Rejected without remarks"
+
     try:
-        reject_request(borrow_request, by_user=request.user, note="Admin rejection")
+        reject_request(borrow_request, by_user=request.user, note=note)
     except BorrowFlowError as exc:
         messages.info(request, str(exc))
-        return redirect("admin_dashboard")
+        return redirect("faculty_dashboard" if role == Profile.ROLE_FACULTY else "admin_requests_console")
     messages.warning(request, "Borrow request rejected and stock restored.")
-    return redirect("admin_dashboard")
+    return redirect("faculty_dashboard" if role == Profile.ROLE_FACULTY else "admin_requests_console")
 
 
 @login_required
 def mark_returned(request, request_id):
     if request.method != "POST":
         messages.error(request, "Invalid request method.")
-        return redirect("admin_dashboard")
+        return redirect("admin_requests_console")
     if not _require_role(request.user, Profile.ROLE_ADMIN):
         messages.error(request, "Only lab admin can mark returns.")
         return redirect("dashboard")
 
     condition = request.POST.get("condition", "").strip()
     borrow_request = get_object_or_404(BorrowRequest, id=request_id)
+    policy, _ = LabPolicy.objects.get_or_create(id=1)
     try:
         mark_request_returned(borrow_request, by_user=request.user, condition=condition)
     except BorrowFlowError as exc:
         messages.info(request, str(exc))
-        return redirect("admin_dashboard")
-    messages.success(request, "Items marked as returned and stock restored.")
+        return redirect("admin_requests_console")
+    condition_total, _ = _calculate_condition_penalty_estimate(borrow_request, policy, condition)
+    if condition_total > 0:
+        messages.warning(
+            request,
+            f"Items marked as returned. Estimated condition fine (component-wise): INR {condition_total}.",
+        )
+    else:
+        messages.success(request, "Items marked as returned and stock restored.")
     _notify_return(borrow_request)
-    return redirect("admin_dashboard")
+    return redirect("admin_requests_console")
 
 
 @login_required
 def mark_issued(request, request_id):
     if request.method != "POST":
         messages.error(request, "Invalid request method.")
-        return redirect("admin_dashboard")
+        return redirect("admin_requests_console")
     if not _require_role(request.user, Profile.ROLE_ADMIN):
         messages.error(request, "Only lab admin can mark collection.")
         return redirect("dashboard")
@@ -649,7 +821,7 @@ def mark_issued(request, request_id):
     collector_name = request.POST.get("collector_name", "").strip()
     if not collector_name:
         messages.error(request, "Collector name is required before marking as collected.")
-        return redirect("admin_dashboard")
+        return redirect("admin_requests_console")
     try:
         mark_request_issued(
             borrow_request,
@@ -658,36 +830,53 @@ def mark_issued(request, request_id):
         )
     except BorrowFlowError as exc:
         messages.info(request, str(exc))
-        return redirect("admin_dashboard")
+        return redirect("admin_requests_console")
     messages.success(request, "Collection recorded.")
-    return redirect("admin_dashboard")
+    return redirect("admin_requests_console")
 
 
 @login_required
 def mark_penalty(request, request_id):
     if request.method != "POST":
         messages.error(request, "Invalid request method.")
-        return redirect("admin_dashboard")
+        return redirect("admin_requests_console")
     if not _require_role(request.user, Profile.ROLE_ADMIN):
         messages.error(request, "Only lab admin can apply penalty status.")
         return redirect("dashboard")
 
     borrow_request = get_object_or_404(BorrowRequest, id=request_id)
-    note = request.POST.get("note", "").strip()
+    manual_note = request.POST.get("note", "").strip()
+    policy, _ = LabPolicy.objects.get_or_create(id=1)
+    estimated_total, overdue_days, breakdown = _calculate_overdue_penalty_estimate(borrow_request, policy)
+    auto_note = ""
+    if overdue_days > 0:
+        auto_note = (
+            f"Estimated overdue fine: INR {estimated_total} (overdue days after grace: {overdue_days}). "
+            f"Breakdown: {' | '.join(breakdown)}"
+        )
+    note = auto_note
+    if manual_note:
+        note = f"{auto_note} | Admin note: {manual_note}" if auto_note else manual_note
     try:
         mark_request_penalty(borrow_request, by_user=request.user, note=note)
     except BorrowFlowError as exc:
         messages.info(request, str(exc))
-        return redirect("admin_dashboard")
-    messages.warning(request, "Penalty stage recorded. Remember to log fines.")
-    return redirect("admin_dashboard")
+        return redirect("admin_requests_console")
+    if overdue_days > 0:
+        messages.warning(
+            request,
+            f"Penalty stage recorded. Estimated overdue fine (component-wise): INR {estimated_total}.",
+        )
+    else:
+        messages.warning(request, "Penalty stage recorded. No overdue charge estimated yet.")
+    return redirect("admin_requests_console")
 
 
 @login_required
 def approve_slip(request, request_id):
     if request.method != "POST":
         messages.error(request, "Invalid request method.")
-        return redirect("admin_dashboard")
+        return redirect("admin_requests_console")
     role = getattr(getattr(request.user, "profile", None), "role", None)
     slip = get_object_or_404(BorrowRequest, id=request_id)
     if role == Profile.ROLE_FACULTY and slip.faculty != request.user:
@@ -699,16 +888,16 @@ def approve_slip(request, request_id):
 
     if slip.status != BorrowRequest.STATUS_PENDING:
         messages.info(request, "Request already processed.")
-        return redirect("faculty_dashboard" if role == Profile.ROLE_FACULTY else "admin_dashboard")
+        return redirect("faculty_dashboard" if role == Profile.ROLE_FACULTY else "admin_requests_console")
 
     try:
         approve_request(slip, by_user=request.user)
     except BorrowFlowError as exc:
         messages.info(request, str(exc))
-        return redirect("faculty_dashboard" if role == Profile.ROLE_FACULTY else "admin_dashboard")
+        return redirect("faculty_dashboard" if role == Profile.ROLE_FACULTY else "admin_requests_console")
 
     messages.success(request, "Request approved.")
-    return redirect("faculty_dashboard" if role == Profile.ROLE_FACULTY else "admin_dashboard")
+    return redirect("faculty_dashboard" if role == Profile.ROLE_FACULTY else "admin_requests_console")
 
 
 @login_required

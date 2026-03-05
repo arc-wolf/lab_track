@@ -9,14 +9,44 @@
         </div>
         <div class="d-flex gap-2">
             <a href="{% url 'admin_component_console' %}" class="btn btn-outline-primary">Policy Parameters</a>
+            <a href="{% url 'admin_requests_console' %}" class="btn btn-primary">Request Queue</a>
             <a href="{% url 'admin_dashboard' %}" class="btn btn-outline-secondary">Back</a>
         </div>
     </div>
 </section>
 
+<div class="row g-3 mb-3">
+    <div class="col-md-4">
+        <div class="glass-panel p-3 h-100">
+            <div class="hero-eyebrow small text-muted">Priority 1</div>
+            <h6 class="mb-1">Condition-triggered returns</h6>
+            <p class="small text-muted mb-0">Investigate items marked by return-condition keywords.</p>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="glass-panel p-3 h-100">
+            <div class="hero-eyebrow small text-muted">Priority 2</div>
+            <h6 class="mb-1">Low stock risk</h6>
+            <p class="small text-muted mb-0">Refill or restrict components nearing unavailable state.</p>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="glass-panel p-3 h-100">
+            <div class="hero-eyebrow small text-muted">Priority 3</div>
+            <h6 class="mb-1">Penalty-stage requests</h6>
+            <p class="small text-muted mb-0">Resolve fines and return closures with complete notes.</p>
+        </div>
+    </div>
+</div>
+
 <div class="glass-panel p-4 mb-3">
-    <div class="small text-muted mb-1">Active maintenance keywords</div>
-    <div class="status-chip">{{ policy.maintenance_keywords }}</div>
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <div>
+            <div class="small text-muted mb-1">Active maintenance keywords</div>
+            <div class="status-chip">{{ policy.maintenance_keywords }}</div>
+        </div>
+        <a href="{% url 'admin_component_console' %}" class="btn btn-sm btn-outline-primary">Edit Keywords</a>
+    </div>
 </div>
 
 <div class="row g-3">
@@ -94,4 +124,3 @@
     </div>
 </div>
 {% endblock %}
-

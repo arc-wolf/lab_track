@@ -50,7 +50,7 @@
 - Add observability basics (structured logs for transitions, task outcomes).
 - Finalize deployment-safe settings profile.
 
-## Current Implementation Status (March 3, 2026)
+## Current Implementation Status (March 5, 2026)
 - Phase 1 (in progress):
   - Compatibility aliases remain in place (`student`/`user`, `BorrowRequestItem`/`BorrowItem`).
   - Signup regressions fixed (faculty submit unblock, group-mode state retention).
@@ -59,6 +59,11 @@
 - Phase 2 (partial):
   - `requests_app/services/borrow_service.py` is active for core lifecycle transitions.
   - Reservation service extraction is still pending; inventory view layer still owns reservation orchestration.
+- Phase 5 (partial):
+  - Admin/faculty request queue UX refined (requester role clarity, reject remarks modal flow).
+  - Admin dashboard converted to overview-only with dedicated request console routing.
+  - Theme contrast and out-of-stock denoters improved across key inventory/request screens.
+  - Navigation wording cleanup started; remaining copy harmonization still pending.
 - Performance:
   - Major admin data-console query path refactored from per-component loops to bulk aggregates.
   - Maintenance queue keyword scanning moved to DB filtering.

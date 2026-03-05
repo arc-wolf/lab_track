@@ -14,7 +14,7 @@
         <h3 class="mb-2 text-center">Create your LabTrack account</h3>
         <p class="text-center text-muted mb-4 small">Use your official Amrita email to auto-classify as Student or Faculty/Staff.</p>
         <div class="d-flex justify-content-end mb-2">
-            <button type="button" class="btn btn-outline-light btn-sm" onclick="history.back()">Back</button>
+            <a href="{% url 'login' %}" class="btn btn-outline-light btn-sm">Back to Login</a>
         </div>
 
         {% if form.errors %}

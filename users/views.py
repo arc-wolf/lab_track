@@ -13,6 +13,7 @@ from django.views.decorators.http import require_POST
 from random import randint
 import logging
 import hashlib
+import re
 
 from .forms import (
     FullNameAuthenticationForm,
@@ -27,6 +28,8 @@ from .models import EmailOTP, Group, GroupMember, GroupRemovalRequest, Profile
 from requests_app.models import BorrowRequest
 
 logger = logging.getLogger(__name__)
+PROFILE_PHONE_REGEX = re.compile(r"^\d{10}$")
+FULL_NAME_REGEX = re.compile(r"^[A-Za-z ]+$")
 
 
 def _client_ip(request) -> str:
@@ -78,10 +81,43 @@ def _attach_legacy_groups_to_faculty(faculty_user):
 
 def _validated_phone_or_message(request, raw_phone: str):
     phone = normalize_phone(raw_phone)
-    if phone and not PHONE_REGEX.match(phone):
-        messages.error(request, "Enter a valid phone number (10-15 digits, optional leading +).")
+    if not phone or not PROFILE_PHONE_REGEX.match(phone):
+        messages.error(request, "Enter a valid 10-digit mobile number.")
         return None
     return phone
+
+
+def _validated_email_or_message(request, user, raw_email: str):
+    email = (raw_email or "").strip().lower()
+    if not email:
+        messages.error(request, "Email cannot be empty.")
+        return None
+    if User.objects.filter(email__iexact=email).exclude(id=user.id).exists():
+        messages.error(request, "This email is already used by another account.")
+        return None
+    return email
+
+
+def _validated_username_or_message(request, user, raw_username: str):
+    username = (raw_username or "").strip()
+    if not username:
+        messages.error(request, "Username cannot be empty.")
+        return None
+    if User.objects.filter(username__iexact=username).exclude(id=user.id).exists():
+        messages.error(request, "This username is already used by another account.")
+        return None
+    return username
+
+
+def _validated_full_name_or_message(request, raw_full_name: str):
+    full_name = (raw_full_name or "").strip()
+    if not full_name:
+        messages.error(request, "Full name is required.")
+        return None
+    if not FULL_NAME_REGEX.match(full_name):
+        messages.error(request, "Full name must contain only alphabets and spaces.")
+        return None
+    return " ".join(full_name.split())
 
 
 @login_required
@@ -230,6 +266,9 @@ def signup(request):
                     messages.success(request, f"Group created. Share this Group ID with teammates: {group.code}")
                 else:
                     messages.success(request, f"Joined group {group.code}.")
+            if profile and profile.role in (Profile.ROLE_STUDENT, Profile.ROLE_FACULTY):
+                profile.email_locked = True
+                profile.save(update_fields=["email_locked"])
             return redirect("dashboard")
     elif request.method == "POST":
         form = SignupForm(request.POST)
@@ -502,20 +541,79 @@ def admin_profile_console(request):
         return redirect("dashboard")
 
     if request.method == "POST":
-        full_name = request.POST.get("full_name", "").strip()
+        action = (request.POST.get("action") or "save_profile").strip()
+        if action == "verify_email_otp":
+            pending_email = request.session.get("pending_admin_email")
+            otp_value = (request.POST.get("otp") or "").strip()
+            if not pending_email:
+                messages.error(request, "No pending email verification found.")
+                return redirect("admin_profile_console")
+            otp_record = (
+                EmailOTP.objects.filter(
+                    email=pending_email,
+                    purpose=EmailOTP.PURPOSE_ADMIN_EMAIL_CHANGE,
+                    is_used=False,
+                )
+                .order_by("-created_at")
+                .first()
+            )
+            if not otp_record or not otp_record.matches(otp_value):
+                messages.error(request, "Invalid or expired OTP.")
+                return redirect("admin_profile_console")
+            request.user.email = pending_email
+            request.user.save(update_fields=["email"])
+            profile.email_locked = True
+            profile.save(update_fields=["email_locked"])
+            otp_record.is_used = True
+            otp_record.save(update_fields=["is_used"])
+            request.session.pop("pending_admin_email", None)
+            messages.success(request, "Email verified and locked successfully.")
+            return redirect("admin_profile_console")
+
+        full_name = _validated_full_name_or_message(request, request.POST.get("full_name", ""))
+        if full_name is None:
+            return redirect("admin_profile_console")
+        username = _validated_username_or_message(request, request.user, request.POST.get("username", ""))
+        if username is None:
+            return redirect("admin_profile_console")
         phone = _validated_phone_or_message(request, request.POST.get("phone", ""))
         if phone is None:
             return redirect("admin_profile_console")
-        email = request.POST.get("email", "").strip()
+        requested_email = _validated_email_or_message(request, request.user, request.POST.get("email", ""))
+        if requested_email is None:
+            return redirect("admin_profile_console")
         password = request.POST.get("password", "").strip()
 
+        request.user.username = username
+        request.user.save(update_fields=["username"])
         profile.full_name = full_name
         profile.phone = phone
         profile.save(update_fields=["full_name", "phone"])
 
-        if email:
-            request.user.email = email
-            request.user.save(update_fields=["email"])
+        current_email = (request.user.email or "").strip().lower()
+        if requested_email != current_email:
+            if profile.email_locked:
+                messages.error(request, "Email is already verified and locked for this admin account.")
+                return redirect("admin_profile_console")
+            otp_record = EmailOTP.create_code(
+                requested_email,
+                EmailOTP.PURPOSE_ADMIN_EMAIL_CHANGE,
+                _generate_otp_code(),
+            )
+            try:
+                _send_otp_email(requested_email, otp_record.code, "Admin Email Change")
+            except Exception as exc:
+                logger.exception("Admin email OTP send failed for %s", requested_email)
+                messages.error(
+                    request,
+                    f"Unable to send email verification OTP now. {exc}" if settings.DEBUG else "Unable to send email verification OTP now.",
+                )
+                return redirect("admin_profile_console")
+            request.session["pending_admin_email"] = requested_email
+            request.session.modified = True
+            messages.info(request, "OTP sent to the new email. Verify to finalize and lock email.")
+            return redirect("admin_profile_console")
+
         if password:
             request.user.set_password(password)
             request.user.save(update_fields=["password"])
@@ -528,7 +626,7 @@ def admin_profile_console(request):
     return render(
         request,
         "admin/profile_console.html",
-        {"admin_profile": profile},
+        {"admin_profile": profile, "pending_admin_email": request.session.get("pending_admin_email")},
     )
 
 
@@ -539,24 +637,28 @@ def student_profile_console(request):
         return redirect("dashboard")
 
     if request.method == "POST":
-        full_name = request.POST.get("full_name", "").strip()
+        full_name = _validated_full_name_or_message(request, request.POST.get("full_name", ""))
+        if full_name is None:
+            return redirect("student_profile_console")
+        username = _validated_username_or_message(request, request.user, request.POST.get("username", ""))
+        if username is None:
+            return redirect("student_profile_console")
         phone = _validated_phone_or_message(request, request.POST.get("phone", ""))
         if phone is None:
             return redirect("student_profile_console")
         semester = request.POST.get("semester", "").strip()
         student_class = request.POST.get("student_class", "").strip()
-        email = request.POST.get("email", "").strip()
         password = request.POST.get("password", "").strip()
 
+        request.user.username = username
+        request.user.save(update_fields=["username"])
         profile.full_name = full_name
         profile.phone = phone
         profile.semester = semester
         profile.student_class = student_class
-        profile.save(update_fields=["full_name", "phone", "semester", "student_class"])
-
-        if email:
-            request.user.email = email
-            request.user.save(update_fields=["email"])
+        profile.email_locked = True
+        profile.save(update_fields=["full_name", "phone", "semester", "student_class", "email_locked"])
+        messages.info(request, "Email is immutable for student accounts after verification.")
         if password:
             request.user.set_password(password)
             request.user.save(update_fields=["password"])
@@ -730,20 +832,24 @@ def faculty_profile_console(request):
         return redirect("dashboard")
 
     if request.method == "POST":
-        full_name = request.POST.get("full_name", "").strip()
+        full_name = _validated_full_name_or_message(request, request.POST.get("full_name", ""))
+        if full_name is None:
+            return redirect("faculty_profile_console")
+        username = _validated_username_or_message(request, request.user, request.POST.get("username", ""))
+        if username is None:
+            return redirect("faculty_profile_console")
         phone = _validated_phone_or_message(request, request.POST.get("phone", ""))
         if phone is None:
             return redirect("faculty_profile_console")
-        email = request.POST.get("email", "").strip()
         password = request.POST.get("password", "").strip()
 
+        request.user.username = username
+        request.user.save(update_fields=["username"])
         profile.full_name = full_name
         profile.phone = phone
-        profile.save(update_fields=["full_name", "phone"])
-
-        if email:
-            request.user.email = email
-            request.user.save(update_fields=["email"])
+        profile.email_locked = True
+        profile.save(update_fields=["full_name", "phone", "email_locked"])
+        messages.info(request, "Email is immutable for faculty accounts after verification.")
         if password:
             request.user.set_password(password)
             request.user.save(update_fields=["password"])

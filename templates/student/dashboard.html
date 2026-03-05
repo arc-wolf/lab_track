@@ -110,8 +110,15 @@
                         {% with pct=0 %}
                         {% endwith %}
                     {% endif %}
-                    <span class="badge bg-light text-dark {% if pct|default:0|floatformat:0 >= 50 %}text-success{% elif pct|default:0|floatformat:0 >= 20 %}text-warning{% else %}text-danger{% endif %}">{{ component.available_stock }} in stock</span>
+                    <span class="badge bg-light {% if pct|default:0|floatformat:0 >= 50 %}text-success{% elif pct|default:0|floatformat:0 >= 20 %}text-warning{% else %}text-danger{% endif %}">
+                        {{ component.available_stock }} available
+                    </span>
                 </div>
+                {% if component.available_stock == 0 %}
+                <div class="mb-2">
+                    <span class="out-of-stock-chip"><i class="bi bi-x-octagon-fill"></i>Out of stock</span>
+                </div>
+                {% endif %}
                 <div class="mb-2 d-flex flex-wrap gap-2">
                     <span class="badge bg-secondary text-uppercase">{{ component.category|default:"Uncategorized" }}</span>
                 </div>

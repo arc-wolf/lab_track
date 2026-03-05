@@ -35,6 +35,7 @@ Primary objective: preserve working flows, close loopholes, and evolve features 
 - Reservation stage locks available stock.
 - Rejection/return restores available stock.
 - Action history must be persisted (`BorrowAction`).
+- Rejection should capture human-readable remarks for auditability.
 
 ## Authentication & Identity Rules (Current)
 
@@ -55,6 +56,9 @@ Primary objective: preserve working flows, close loopholes, and evolve features 
 3. **Component Policy Console**: fines, grace, maintenance keyword controls.
 4. **Data Console**: analytics + risk patterns + movement visibility.
 5. Plus maintenance queue, reports, admin profile.
+6. **Admin Dashboard** is overview-only:
+   - decision layer with priority inbox, not full action surface.
+   - detailed actions happen in dedicated consoles.
 
 ## UI/UX Intent
 
@@ -62,6 +66,7 @@ Primary objective: preserve working flows, close loopholes, and evolve features 
 - Global feedback uses toast notifications.
 - Branded custom error pages exist (`400/403/403_csrf/404/500`).
 - Actions that mutate state must be POST + CSRF protected.
+- Stock-unavailable components should be visually denoted, not implied.
 
 ## Engineering Guardrails
 
@@ -69,6 +74,9 @@ Primary objective: preserve working flows, close loopholes, and evolve features 
 - Do not reintroduce GET-based state changes.
 - Keep student shared-team behavior intact.
 - Keep faculty self-assignment behavior for faculty-generated slips.
+- Keep per-component fine fallback deterministic:
+  - component override when set
+  - otherwise global `LabPolicy` value
 - Keep OTP flows secure and deterministic:
   - invalidate old active OTP when new OTP is issued for same purpose/email.
   - enforce expiry and one-time use.
@@ -84,6 +92,18 @@ Primary objective: preserve working flows, close loopholes, and evolve features 
 - Full-name login flow implemented.
 - Toast message UX + custom error pages implemented.
 - SMTP mail sending works when `.env` is correctly configured.
+- Admin/faculty reject flow supports modal remarks.
+- Request queues show requester role to avoid faculty-vs-student ambiguity.
+- Profile update flow enforces stronger email/phone validation.
+- Admin dashboard is overview-only; full request handling is in dedicated request console page.
+- Admin API exposes `/api/admin/overview/` and `/api/admin/console-map/` for control-plane clients.
+- Admin overview now uses count-driven priority logic:
+  - prioritizes pending approvals, overdue/penalty workload, pending groups, low stock, and maintenance flags.
+  - quick request glimpse surfaces urgent states first.
+- Admin API also supports policy/fine administration:
+  - `GET /api/admin/policy/`
+  - `POST /api/admin/policy/update/`
+  - `POST /api/admin/components/<id>/fines/`
 
 ## Known Operational Dependencies
 

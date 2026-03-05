@@ -5,12 +5,13 @@ from django.contrib.auth import authenticate
 from django.contrib.auth.models import User
 from django.core.cache import cache
 from django.conf import settings
+from django.db.models import Count, Q
 from django.http import JsonResponse
 from django.views.decorators.http import require_GET, require_POST
 from django.views.decorators.csrf import csrf_exempt
 
 from inventory.models import Component
-from requests_app.models import BorrowRequest
+from requests_app.models import BorrowItem, BorrowRequest, LabPolicy
 from users.models import APIToken, Group, Profile
 
 from .auth import token_auth_required
@@ -44,6 +45,13 @@ def _parse_json(request):
         return json.loads(body)
     except (UnicodeDecodeError, json.JSONDecodeError):
         return None
+
+
+def _admin_required_or_403(request):
+    role = getattr(getattr(request.api_user, "profile", None), "role", "")
+    if role != Profile.ROLE_ADMIN:
+        return JsonResponse({'error': 'Admin role required.'}, status=403)
+    return None
 
 
 @csrf_exempt
@@ -134,3 +142,183 @@ def borrow_requests(request):
             queryset = slips.filter(user=user).order_by('-created_at')[:100]
 
     return JsonResponse({'requests': [serialize_borrow_request(slip) for slip in queryset]})
+
+
+@require_GET
+@token_auth_required
+def admin_overview(request):
+    admin_error = _admin_required_or_403(request)
+    if admin_error:
+        return admin_error
+
+    stats = BorrowRequest.objects.aggregate(
+        pending=Count("id", filter=Q(status=BorrowRequest.STATUS_PENDING)),
+        approved=Count("id", filter=Q(status=BorrowRequest.STATUS_APPROVED)),
+        issued=Count("id", filter=Q(status=BorrowRequest.STATUS_ISSUED)),
+        returned=Count("id", filter=Q(status=BorrowRequest.STATUS_RETURNED)),
+        penalty=Count("id", filter=Q(status=BorrowRequest.STATUS_PENALTY)),
+        rejected=Count("id", filter=Q(status=BorrowRequest.STATUS_REJECTED)),
+        overdue=Count("id", filter=Q(status=BorrowRequest.STATUS_OVERDUE)),
+    )
+    pending_groups_count = Group.objects.filter(status=Group.STATUS_PENDING).count()
+    low_stock_count = Component.objects.filter(available_stock__lte=2).count()
+    maintenance_count = BorrowItem.objects.filter(
+        borrow_request__status=BorrowRequest.STATUS_RETURNED,
+    ).filter(
+        Q(borrow_request__return_condition__icontains="service")
+        | Q(borrow_request__return_condition__icontains="damaged")
+        | Q(borrow_request__return_condition__icontains="not working")
+        | Q(borrow_request__return_condition__icontains="missing")
+    ).count()
+    latest_requests = BorrowRequest.objects.select_related("user", "faculty", "group").prefetch_related("items__component").order_by("-created_at")[:6]
+    priority_items = [
+        {'key': 'pending_requests', 'count': stats.get('pending', 0), 'url': '/requests/admin/requests/?status=PENDING'},
+        {'key': 'overdue_penalty', 'count': (stats.get('overdue', 0) or 0) + (stats.get('penalty', 0) or 0), 'url': '/requests/admin/requests/?status=OVERDUE'},
+        {'key': 'pending_groups', 'count': pending_groups_count, 'url': '/users/admin/groups/'},
+        {'key': 'low_stock', 'count': low_stock_count, 'url': '/inventory/admin/components/?stock=low'},
+        {'key': 'maintenance_flags', 'count': maintenance_count, 'url': '/requests/admin/maintenance/'},
+    ]
+
+    return JsonResponse(
+        {
+            'overview': {
+                'stats': stats,
+                'pending_groups_count': pending_groups_count,
+                'low_stock_count': low_stock_count,
+                'maintenance_count': maintenance_count,
+                'priority_items': priority_items,
+                'latest_requests': [serialize_borrow_request(slip) for slip in latest_requests],
+            }
+        }
+    )
+
+
+@require_GET
+@token_auth_required
+def admin_console_map(request):
+    admin_error = _admin_required_or_403(request)
+    if admin_error:
+        return admin_error
+
+    return JsonResponse(
+        {
+            'console_map': {
+                'dashboard': '/requests/admin/',
+                'request_console': '/requests/admin/requests/',
+                'inventory_console': '/inventory/admin/components/',
+                'policy_console': '/requests/admin/component-console/',
+                'maintenance_console': '/requests/admin/maintenance/',
+                'analytics_console': '/requests/admin/analytics/',
+                'reports_console': '/requests/admin/reports-console/',
+                'profile_console': '/users/admin/profile-console/',
+            }
+        }
+    )
+
+
+@require_GET
+@token_auth_required
+def admin_policy(request):
+    admin_error = _admin_required_or_403(request)
+    if admin_error:
+        return admin_error
+
+    policy, _ = LabPolicy.objects.get_or_create(id=1)
+    return JsonResponse(
+        {
+            'policy': {
+                'per_day_fine': policy.per_day_fine,
+                'grace_days': policy.grace_days,
+                'overdue_penalty_trigger_days': policy.overdue_penalty_trigger_days,
+                'damaged_fine': policy.damaged_fine,
+                'missing_parts_fine': policy.missing_parts_fine,
+                'not_working_fine': policy.not_working_fine,
+                'maintenance_keywords': policy.maintenance_keywords,
+                'notes': policy.notes,
+            }
+        }
+    )
+
+
+@csrf_exempt
+@require_POST
+@token_auth_required
+def admin_update_policy(request):
+    admin_error = _admin_required_or_403(request)
+    if admin_error:
+        return admin_error
+
+    payload = _parse_json(request)
+    if payload is None:
+        return JsonResponse({'error': 'Invalid JSON body.'}, status=400)
+
+    policy, _ = LabPolicy.objects.get_or_create(id=1)
+    int_fields = [
+        "per_day_fine",
+        "grace_days",
+        "overdue_penalty_trigger_days",
+        "damaged_fine",
+        "missing_parts_fine",
+        "not_working_fine",
+    ]
+    for field in int_fields:
+        if field not in payload:
+            continue
+        value = payload.get(field)
+        if not isinstance(value, int) or value < 0:
+            return JsonResponse({'error': f'{field} must be a non-negative integer.'}, status=400)
+        setattr(policy, field, value)
+
+    if "maintenance_keywords" in payload:
+        value = payload.get("maintenance_keywords")
+        if not isinstance(value, str):
+            return JsonResponse({'error': 'maintenance_keywords must be a string.'}, status=400)
+        policy.maintenance_keywords = value.strip()
+    if "notes" in payload:
+        value = payload.get("notes")
+        if not isinstance(value, str):
+            return JsonResponse({'error': 'notes must be a string.'}, status=400)
+        policy.notes = value.strip()
+    policy.save()
+    return JsonResponse({'ok': True})
+
+
+@csrf_exempt
+@require_POST
+@token_auth_required
+def admin_update_component_fines(request, component_id: int):
+    admin_error = _admin_required_or_403(request)
+    if admin_error:
+        return admin_error
+
+    payload = _parse_json(request)
+    if payload is None:
+        return JsonResponse({'error': 'Invalid JSON body.'}, status=400)
+
+    component = Component.objects.filter(id=component_id).first()
+    if not component:
+        return JsonResponse({'error': 'Component not found.'}, status=404)
+
+    fine_fields = [
+        "fine_per_day",
+        "fine_damaged",
+        "fine_missing_parts",
+        "fine_not_working",
+    ]
+    touched = []
+    for field in fine_fields:
+        if field not in payload:
+            continue
+        value = payload.get(field)
+        if value is None:
+            setattr(component, field, None)
+            touched.append(field)
+            continue
+        if not isinstance(value, int) or value < 0:
+            return JsonResponse({'error': f'{field} must be a non-negative integer or null.'}, status=400)
+        setattr(component, field, value)
+        touched.append(field)
+    if not touched:
+        return JsonResponse({'error': 'No fine fields provided.'}, status=400)
+    component.save(update_fields=touched)
+    return JsonResponse({'component': serialize_component(component)})

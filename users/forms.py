@@ -12,7 +12,11 @@ PHONE_REGEX = re.compile(r"^\+?[0-9]{10,15}$")
 
 
 def normalize_phone(raw_value: str) -> str:
-    value = (raw_value or "").strip().replace(" ", "").replace("-", "")
+    value = (raw_value or "").strip()
+    value = re.sub(r"[()\s.\-]", "", value)
+    if value.startswith("++"):
+        value = value.lstrip("+")
+        value = f"+{value}"
     return value
 
 

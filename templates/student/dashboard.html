@@ -34,40 +34,22 @@
     </div>
 </section>
 
-<div class="row g-3 mb-4">
-    <div class="col-md-3">
-        <div class="card h-100">
-            <div class="card-body">
-                <p class="text-muted mb-2">Active Borrows</p>
-                <div class="stat-number fs-3">{{ summary.active }}</div>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card h-100">
-            <div class="card-body">
-                <p class="text-muted mb-2">Pending Requests</p>
-                <div class="stat-number fs-3">{{ summary.pending }}</div>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card h-100">
-            <div class="card-body">
-                <p class="text-muted mb-2">Max Allowed</p>
-                <div class="stat-number fs-3">{{ summary.max_allowed }}</div>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card h-100">
-            <div class="card-body">
-                <p class="text-muted mb-2">Current Reserved</p>
-                <div class="stat-number fs-3">{{ summary.reserved }}</div>
-            </div>
-        </div>
+<div class="glass-panel p-3 mb-4">
+    <div class="d-flex flex-wrap align-items-center gap-2">
+        <span class="small text-muted me-2">Quick stats</span>
+        <a href="{% url 'student_requests' %}" class="btn btn-sm btn-outline-secondary">Active: {{ summary.active }}</a>
+        <a href="{% url 'student_requests' %}" class="btn btn-sm btn-outline-secondary">Pending: {{ summary.pending }}</a>
+        <span class="btn btn-sm btn-outline-secondary disabled">Limit: {{ summary.max_allowed }}</span>
+        <span class="btn btn-sm btn-outline-secondary disabled">Remaining: {{ summary.remaining }}</span>
+        <a href="{% url 'view_cart' %}" class="btn btn-sm btn-primary">Reserved: {{ summary.reserved }}</a>
     </div>
 </div>
+
+{% if summary.remaining == 0 %}
+<div class="alert alert-warning glass-panel p-3">
+    <strong>Borrow limit reached.</strong> Please return or submit slips before reserving more components.
+</div>
+{% endif %}
 
 <!-- FILTER -->
 <div class="glass-panel p-3 mb-4">
@@ -88,8 +70,8 @@
                 <input type="text" name="q" value="{{ search_query }}" class="form-control" placeholder="Search components">
             </div>
         </div>
-        <div class="col-md-2 d-flex align-items-end">
-            <button class="btn btn-secondary w-100" type="submit">Apply</button>
+        <div class="col-md-2 col-12 d-flex align-items-stretch">
+            <button class="btn btn-secondary w-100 align-self-end" type="submit">Apply</button>
         </div>
     </form>
 </div>
@@ -124,7 +106,7 @@
                 </div>
                 <p class="text-muted small mb-3 flex-grow-1">Select quantity to reserve. Stock is locked immediately.</p>
 
-                {% if component.available_stock > 0 and can_borrow %}
+                {% if component.available_stock > 0 and can_borrow and quota_remaining > 0 %}
                 <form method="POST" action="{% url 'add_to_cart' component.id %}" class="quantity-form">
                     {% csrf_token %}
                     <div class="d-flex align-items-center gap-2">
@@ -136,6 +118,8 @@
                 </form>
                 {% elif component.available_stock == 0 %}
                 <button class="btn btn-secondary w-100" disabled>Out of Stock</button>
+                {% elif quota_remaining == 0 %}
+                <button class="btn btn-secondary w-100" disabled>Borrow limit reached</button>
                 {% else %}
                 <button class="btn btn-secondary w-100" disabled>Waiting for access</button>
                 {% endif %}

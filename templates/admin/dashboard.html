@@ -32,42 +32,15 @@
     </div>
 </div>
 
-<div class="row g-3 mb-4">
-    <div class="col-md-8">
-        <div class="glass-panel p-3 h-100">
-            <div class="d-flex justify-content-between align-items-center mb-2">
-                <div>
-                    <div class="hero-eyebrow">Action Inbox</div>
-                    <h6 class="mb-0">Prioritized tasks</h6>
-                </div>
-            </div>
-            <div class="row g-2">
-                {% for item in priority_items %}
-                <div class="col-md-6">
-                    <a
-                        class="d-flex justify-content-between align-items-center text-decoration-none p-2 rounded-3 border"
-                        style="border-color: var(--glass-stroke) !important; background: var(--surface);"
-                        href="{% url item.href %}{% if item.query %}?{{ item.query }}{% endif %}"
-                    >
-                        <span class="small text-muted">{{ item.label }}</span>
-                        <span class="badge {% if item.severity == 'high' and item.count > 0 %}bg-danger{% elif item.severity == 'warn' and item.count > 0 %}bg-warning text-dark{% else %}bg-success{% endif %}">{{ item.count }}</span>
-                    </a>
-                </div>
-                {% endfor %}
-            </div>
-        </div>
-    </div>
-    <div class="col-md-4">
-        <div class="glass-panel p-3 h-100">
-            <div class="hero-eyebrow">System Health</div>
-            <div class="small text-muted mb-2">Request status snapshot</div>
-            <div class="d-flex justify-content-between small mb-1"><span>Pending</span><strong>{{ stats.pending|default:0 }}</strong></div>
-            <div class="d-flex justify-content-between small mb-1"><span>Approved</span><strong>{{ stats.approved|default:0 }}</strong></div>
-            <div class="d-flex justify-content-between small mb-1"><span>Issued</span><strong>{{ stats.issued|default:0 }}</strong></div>
-            <div class="d-flex justify-content-between small mb-1"><span>Overdue</span><strong class="text-danger">{{ stats.overdue|default:0 }}</strong></div>
-            <div class="d-flex justify-content-between small mb-1"><span>Penalty</span><strong>{{ stats.penalty|default:0 }}</strong></div>
-            <div class="d-flex justify-content-between small"><span>Pending Groups</span><strong>{{ pending_groups_count }}</strong></div>
-        </div>
+<div class="glass-panel p-3 mb-4">
+    <div class="d-flex flex-wrap align-items-center gap-2">
+        <span class="small text-muted me-2">Quick status</span>
+        <a href="{% url 'admin_requests_console' %}?status=PENDING" class="btn btn-sm btn-outline-secondary">Pending: {{ stats.pending|default:0 }}</a>
+        <a href="{% url 'admin_requests_console' %}?status=APPROVED" class="btn btn-sm btn-outline-secondary">Approved: {{ stats.approved|default:0 }}</a>
+        <a href="{% url 'admin_requests_console' %}?status=ISSUED" class="btn btn-sm btn-outline-secondary">Issued: {{ stats.issued|default:0 }}</a>
+        <a href="{% url 'admin_requests_console' %}?status=OVERDUE" class="btn btn-sm btn-outline-secondary">Overdue: {{ stats.overdue|default:0 }}</a>
+        <a href="{% url 'admin_requests_console' %}?status=PENALTY" class="btn btn-sm btn-outline-secondary">Penalty: {{ stats.penalty|default:0 }}</a>
+        <a href="{% url 'admin_groups' %}" class="btn btn-sm btn-primary">Pending Groups: {{ pending_groups_count }}</a>
     </div>
 </div>
 

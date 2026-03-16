@@ -1,6 +1,6 @@
 # LabTrack Django Master Tutorial (Project Anatomy Edition)
 
-Last updated: March 5, 2026
+Last updated: March 6, 2026
 
 ## 0) Read This First
 This tutorial is designed to teach Django by dissecting the LabTrack project itself.
@@ -650,3 +650,81 @@ Use this section as a guided navigation index. Open each file and jump to the li
 5. `api/urls.py:5`, `api/auth.py:10`, `api/views.py:59`, `109`, `149`, `221`, `246`, `289`
 6. `templates/base.html:1`, then role templates (`student`, `faculty`, `admin`)
 7. all tests listed in 17.7
+
+## 18) Hands-On Practice Pack (Build Real Mastery)
+
+### 18.1 Exercise A: Add a New Component Category
+Goal:
+- Add one category (example: `SENSORS`) across model/form/UI/API and verify filtering works.
+
+Implementation path:
+1. Update category choices in `inventory/models.py`.
+2. Ensure form validation accepts the new category in `inventory/forms.py`.
+3. Confirm admin create/edit templates show the option.
+4. Confirm API serializers return the new category cleanly.
+
+Proof checklist:
+- Admin can create a component with the new category.
+- Student dashboard filter returns items in that category.
+- `python manage.py test inventory api`
+
+### 18.2 Exercise B: Add “CANCELLED” Request State
+Goal:
+- Let requester cancel only `PENDING` slips before issue.
+
+Implementation path:
+1. Add `CANCELLED` in `BorrowRequest.status` choices.
+2. Add transition handler in `requests_app/services/borrow_service.py`.
+3. Expose a safe endpoint/view action with role checks.
+4. Add UI button only for allowed state and owner.
+
+Proof checklist:
+- `PENDING -> CANCELLED` works.
+- stock/reservations are released correctly.
+- action timeline stores cancellation actor/time/reason.
+- invalid transitions (like `ISSUED -> CANCELLED`) are rejected.
+
+### 18.3 Exercise C: Add API Endpoint for “My Overdue Items”
+Goal:
+- `GET /api/me/overdue/` returns active overdue borrow items for token owner.
+
+Implementation path:
+1. Add URL in `api/urls.py`.
+2. Implement token-protected view in `api/views.py`.
+3. Reuse serializer or add focused response payload.
+4. Include due date, days overdue, and projected fine fields.
+
+Proof checklist:
+- unauthenticated call returns 401.
+- authenticated user sees only own overdue items.
+- non-overdue active items are excluded.
+- add API tests for empty and non-empty response.
+
+### 18.4 Exercise D: Hardening Test for Role Boundaries
+Goal:
+- Guarantee student tokens cannot call admin policy update endpoints.
+
+Implementation path:
+1. Add negative tests in `api/tests.py` for `POST /api/admin/policy/update/`.
+2. Verify response is 403 and policy data remains unchanged.
+3. Add a positive admin-path test in same suite.
+
+Proof checklist:
+- boundary tests pass reliably.
+- no privilege escalation path via alternate payloads.
+
+### 18.5 Debugging Protocol During Exercises
+When anything breaks, debug in this order:
+1. Route exists and method is correct.
+2. Auth/role guards are passing.
+3. Input validation accepted expected values.
+4. DB mutation actually committed.
+5. Response/template uses updated field names.
+6. Test expected value matches current business rule.
+
+### 18.6 Completion Criteria
+You can claim practical mastery when all are true:
+- You implemented at least 2 exercises end-to-end.
+- You wrote/updated tests for each change.
+- You can explain every state transition you changed.
+- You can reproduce one bug and fix it with a regression test.

@@ -813,7 +813,7 @@ def student_group_console(request):
 
         return redirect("student_group_console")
 
-    members = group.members.select_related("user").order_by("-role", "joined_at")
+    members = group.members.select_related("user", "user__profile").order_by("-role", "joined_at")
     pending_removals = group.removal_requests.filter(status=GroupRemovalRequest.STATUS_PENDING).select_related("member")
     context = {
         "group": group,

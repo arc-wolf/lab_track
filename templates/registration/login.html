@@ -3,6 +3,10 @@
 <style>
     .auth-shell { max-width: 540px; margin: 0 auto; }
     .auth-link-row { row-gap: 0.5rem; }
+    .password-wrap .toggle-password {
+        min-width: 72px;
+        font-weight: 600;
+    }
     @media (max-width: 576px) {
         .auth-link-row {
             flex-direction: column;
@@ -17,7 +21,7 @@
             <p class="text-center text-muted small mb-4">Use your campus credentials to continue.</p>
             {% if form.errors %}
             <div class="alert alert-danger small">
-                Login failed. Check your credentials and password, then try again.
+                Unable to sign in. Check your login details and try again.
             </div>
             {% endif %}
             {% if next and user.is_authenticated %}
@@ -27,11 +31,6 @@
             {% endif %}
             <form method="post" class="mb-3">
                 {% csrf_token %}
-                {% if form.non_field_errors %}
-                <div class="alert alert-warning py-2 small mb-3">
-                    {{ form.non_field_errors }}
-                </div>
-                {% endif %}
                 <div class="mb-3">
                     <label class="form-label">Full Name or Email</label>
                     <input type="text"
@@ -48,11 +47,15 @@
                 </div>
                 <div class="mb-3">
                     <label class="form-label">Password</label>
-                    <input type="password"
-                           name="{{ form.password.html_name }}"
-                           autocomplete="current-password"
-                           class="form-control"
-                           placeholder="••••••••" />
+                    <div class="input-group password-wrap">
+                        <input type="password"
+                               id="id_password"
+                               name="{{ form.password.html_name }}"
+                               autocomplete="current-password"
+                               class="form-control"
+                               placeholder="••••••••" />
+                        <button type="button" class="btn btn-outline-secondary toggle-password" data-target="id_password">Show</button>
+                    </div>
                     {% if form.password.errors %}
                     <div class="text-danger small mt-1">{{ form.password.errors|striptags }}</div>
                     {% endif %}
@@ -61,11 +64,23 @@
             </form>
             <div class="d-flex justify-content-between align-items-center flex-wrap auth-link-row">
                 <a href="{% url 'password_reset' %}" class="small text-decoration-none">Forgot password?</a>
-                <a href="{% url 'signup' %}" class="small text-decoration-none fw-semibold">
-                    Need an Amrita account? Register here
-                </a>
+                <a href="{% url 'signup' %}" class="small text-decoration-none fw-semibold">Register here</a>
             </div>
         </div>
     </div>
 </div>
+<script>
+    (() => {
+        document.querySelectorAll('.toggle-password').forEach((btn) => {
+            btn.addEventListener('click', () => {
+                const targetId = btn.getAttribute('data-target');
+                const input = document.getElementById(targetId);
+                if (!input) return;
+                const show = input.type === 'password';
+                input.type = show ? 'text' : 'password';
+                btn.textContent = show ? 'Hide' : 'Show';
+            });
+        });
+    })();
+</script>
 {% endblock %}

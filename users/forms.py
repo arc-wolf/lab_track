@@ -11,6 +11,29 @@ from django.utils.text import slugify
 PHONE_REGEX = re.compile(r"^\+?[0-9]{10,15}$")
 
 
+PROGRAM_CHOICES = (
+    ("btech", "B.Tech"),
+    ("mtech", "M.Tech"),
+    ("mca", "MCA"),
+    ("phd", "Ph.D"),
+)
+
+BRANCH_CHOICES = (
+    ("cse", "Computer Science and Engineering"),
+    ("cse_ai", "CSE (Artificial Intelligence)"),
+    ("cse_cyber", "CSE (Cyber Security)"),
+    ("ai_ds", "Artificial Intelligence & Data Science"),
+    ("ece", "Electronics & Communication Engineering"),
+    ("eee", "Electrical & Electronics Engineering"),
+    ("mech", "Mechanical Engineering"),
+    ("robo_ai", "Robotics & AI"),
+    ("eac", "Electrical & Computer Engineering"),
+    ("elc", "Electronics & Computer Engineering"),
+)
+
+BATCH_CHOICES = tuple((str(year), f"Batch {year}") for year in range(2022, 2031))
+
+
 def normalize_phone(raw_value: str) -> str:
     value = (raw_value or "").strip()
     value = re.sub(r"[()\s.\-]", "", value)
@@ -24,7 +47,9 @@ class SignupForm(UserCreationForm):
     email = forms.EmailField(required=True, help_text="Use your @amrita.edu organization email.")
     full_name = forms.CharField(required=True, max_length=150, label="Full Name")
     semester = forms.CharField(required=False, max_length=20)
-    student_class = forms.CharField(required=False, max_length=50, label="Class")
+    student_class = forms.ChoiceField(required=False, choices=PROGRAM_CHOICES, label="Program")
+    branch = forms.ChoiceField(required=False, choices=BRANCH_CHOICES, label="Branch")
+    batch_year = forms.ChoiceField(required=False, choices=BATCH_CHOICES, label="Batch")
     # group flow
     group_mode = forms.ChoiceField(
         choices=(("create", "Create new group"), ("join", "Join existing group")),
@@ -55,6 +80,8 @@ class SignupForm(UserCreationForm):
             "phone",
             "semester",
             "student_class",
+            "branch",
+            "batch_year",
             "group_mode",
             "join_group_code",
             "group_id",
@@ -101,6 +128,8 @@ class SignupForm(UserCreationForm):
         if role == Profile.ROLE_STUDENT:
             for field in ("semester", "student_class", "group_id"):
                 cleaned.setdefault(field, "")
+            for field in ("branch", "batch_year"):
+                cleaned.setdefault(field, "")
             mode = cleaned.get("group_mode") or "create"
             if mode not in ("create", "join"):
                 self.add_error("group_mode", "Choose create or join.")
@@ -108,6 +137,12 @@ class SignupForm(UserCreationForm):
                 self.add_error("phone", "Required for students.")
             if not cleaned.get("full_name"):
                 self.add_error("full_name", "Required for students.")
+            if not cleaned.get("student_class"):
+                self.add_error("student_class", "Select your program.")
+            if not cleaned.get("branch"):
+                self.add_error("branch", "Select your branch.")
+            if not cleaned.get("batch_year"):
+                self.add_error("batch_year", "Select your batch.")
             if mode == "create":
                 if not cleaned.get("group_name"):
                     self.add_error("group_name", "Group name required when creating.")
@@ -149,6 +184,8 @@ class SignupForm(UserCreationForm):
             profile.role = role
             profile.semester = self.cleaned_data.get("semester", "")
             profile.student_class = self.cleaned_data.get("student_class", "")
+            profile.branch = self.cleaned_data.get("branch", "")
+            profile.batch_year = self.cleaned_data.get("batch_year", "")
             mode = self.cleaned_data.get("group_mode") or "create"
             if role == Profile.ROLE_STUDENT:
                 if mode == "create":

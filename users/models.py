@@ -32,6 +32,9 @@ class Profile(models.Model):
     email_locked = models.BooleanField(default=False)
     faculty_incharge = models.CharField(max_length=100, blank=True)
     full_name = models.CharField(max_length=150, blank=True)
+    program = models.CharField(max_length=50, blank=True)
+    branch = models.CharField(max_length=50, blank=True)
+    batch_year = models.CharField(max_length=10, blank=True)
 
     def __str__(self) -> str:  # pragma: no cover - display helper
         return f"{self.user.username} ({self.get_role_display()})"
@@ -179,13 +182,17 @@ class APIToken(models.Model):
     key = models.CharField(max_length=64, unique=True, db_index=True, default=generate_api_token_key)
     created_at = models.DateTimeField(auto_now_add=True)
     last_used_at = models.DateTimeField(auto_now=True)
+    expires_at = models.DateTimeField(null=True, blank=True, db_index=True)
 
     def __str__(self):
         return f"API Token for {self.user.username}"
 
     def rotate(self):
         self.key = generate_api_token_key()
-        self.save(update_fields=["key", "last_used_at"])
+        from django.conf import settings
+        lifetime_days = int(getattr(settings, "API_TOKEN_MAX_AGE_DAYS", 30))
+        self.expires_at = timezone.now() + timedelta(days=lifetime_days)
+        self.save(update_fields=["key", "last_used_at", "expires_at"])
 
     def touch(self):
         self.save(update_fields=["last_used_at"])

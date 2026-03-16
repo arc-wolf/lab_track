@@ -94,7 +94,9 @@ def generate_borrow_slip_pdf(borrow_request_id):
     department = getattr(profile, "student_class", "") or "________________"
     batch = getattr(profile, "semester", "") or "________"
     request_date = borrow_request.created_at.date()
+    request_date_str = request_date.strftime("%d/%m/%Y")
     due_date = borrow_request.due_date or (request_date + timedelta(days=45))
+    due_date_str = due_date.strftime("%d/%m/%Y")
     requester_role = getattr(profile, "role", "")
 
     styles = _build_styles()
@@ -115,19 +117,11 @@ def generate_borrow_slip_pdf(borrow_request_id):
     elements.append(Paragraph("Hardware & IoT LAB", styles["Header"]))
     elements.append(Paragraph("Equipment’s /Components request & Issue Form", styles["SubHeader"]))
 
-    # Right aligned meta
-    meta_lines = [
-        f"Request ID: {borrow_request.id}",
-        f"Status: {borrow_request.status}",
-    ]
-    elements.append(Paragraph("<br/>".join(meta_lines), styles["SmallRight"]))
-    elements.append(Spacer(1, 6))
-
     # Details section
     detail_lines = [
         f"Group No: {group_no}",
         f"Project/work Title : {project_title}",
-        f"Department : {department}    Batch: {batch}    Request Date: {request_date}",
+        f"Department : {department}    Batch: {batch}    Request Date: {request_date_str}",
     ]
     for line in detail_lines:
         elements.append(Paragraph(line, styles["Label"]))
@@ -162,10 +156,9 @@ def generate_borrow_slip_pdf(borrow_request_id):
         Paragraph("Sl No", styles["TableCell"]),
         Paragraph("Equipment / Component", styles["TableCell"]),
         Paragraph("Qty", styles["TableCell"]),
-        Paragraph("Rec Date", styles["TableCell"]),
-        Paragraph("Sign", styles["TableCell"]),
-        Paragraph("Return Date", styles["TableCell"]),
-        Paragraph("Staff Sign", styles["TableCell"]),
+        Paragraph("Request Date", styles["TableCell"]),
+        Paragraph("Collected Date", styles["TableCell"]),
+        Paragraph("Return By", styles["TableCell"]),
         Paragraph("Remarks", styles["TableCell"]),
     ]
 
@@ -176,18 +169,16 @@ def generate_borrow_slip_pdf(borrow_request_id):
 
     item_rows = []
     for idx, item in enumerate(borrow_request.items.select_related("component"), start=1):
-        rec_date = request_date.strftime("%Y-%m-%d")
-        return_date = due_date.strftime("%Y-%m-%d")
-        staff_display = staff_name if requester_role == "student" else ""
+        rec_date = request_date_str
+        return_date = due_date_str
         item_rows.append(
             [
                 Paragraph(str(idx), styles["TableCell"]),
                 Paragraph(item.component.name, styles["TableCell"]),
                 Paragraph(str(item.quantity), styles["TableCell"]),
                 Paragraph(rec_date, styles["TableCell"]),
-                Paragraph("", styles["TableCell"]),
+                Paragraph("", styles["TableCell"]),  # collected date
                 Paragraph(return_date, styles["TableCell"]),
-                Paragraph(staff_display, styles["TableCell"]),
                 Paragraph("", styles["TableCell"]),
             ]
         )
@@ -200,7 +191,7 @@ def generate_borrow_slip_pdf(borrow_request_id):
 
     data = [headers] + item_rows[:10]
 
-    col_widths = [25, 150, 35, 50, 40, 50, 40, 60]
+    col_widths = [25, 150, 35, 60, 60, 60, 70]
     row_heights = [30] + [38] * 10
 
     table = Table(
@@ -220,7 +211,7 @@ def generate_borrow_slip_pdf(borrow_request_id):
         ("FONTSIZE", (0, 1), (-1, -1), 10),
         ("ALIGN", (0, 0), (0, -1), "CENTER"),  # Sl No
         ("ALIGN", (2, 0), (2, -1), "CENTER"),  # Qty
-        ("ALIGN", (3, 0), (6, -1), "CENTER"),  # dates/signs
+        ("ALIGN", (3, 0), (5, -1), "CENTER"),  # dates
         ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
         ("LEFTPADDING", (0, 0), (-1, -1), 4),
         ("RIGHTPADDING", (0, 0), (-1, -1), 4),

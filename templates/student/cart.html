@@ -63,13 +63,25 @@
     <div class="col-md-6">
         <div class="glass-panel p-3 h-100">
             <h6 class="mb-2 text-muted">Faculty Incharge</h6>
-            <p class="small text-muted mb-2">Select who will approve your slip.</p>
-            <select name="faculty" form="generateSlipForm" class="form-select" required>
-                <option value="">Select faculty</option>
-                {% for faculty in faculties %}
-                <option value="{{ faculty.id }}">{{ faculty.full_name|default:faculty.user.get_full_name|default:faculty.user.username }}</option>
-                {% endfor %}
-            </select>
+            {% if preassigned_faculty %}
+                <p class="small text-muted mb-2">Linked to your group.</p>
+                <div class="d-flex align-items-center justify-content-between">
+                    <div>
+                        <div class="fw-semibold">{{ preassigned_faculty.get_full_name|default:preassigned_faculty.username }}</div>
+                        <div class="small text-muted">{{ preassigned_faculty.email }}</div>
+                    </div>
+                    <span class="badge bg-secondary">Pre-assigned</span>
+                </div>
+                <input type="hidden" name="faculty" form="generateSlipForm" value="{{ preassigned_faculty.profile.id }}">
+            {% else %}
+                <p class="small text-muted mb-2">Select who will approve your slip.</p>
+                <select name="faculty" form="generateSlipForm" class="form-select" required>
+                    <option value="">Select faculty</option>
+                    {% for faculty in faculties %}
+                    <option value="{{ faculty.id }}">{{ faculty.full_name|default:faculty.user.get_full_name|default:faculty.user.username }}</option>
+                    {% endfor %}
+                </select>
+            {% endif %}
         </div>
     </div>
     {% endif %}

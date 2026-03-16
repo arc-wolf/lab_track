@@ -123,6 +123,7 @@ def student_dashboard(request):
             Reservation.objects.filter(user=request.user, is_active=True).aggregate(total=Sum("quantity")).get("total") or 0
         )
     max_allowed = getattr(settings, "STUDENT_MAX_ACTIVE", 10)
+    quota_remaining = max(max_allowed - current_reserved, 0)
 
     return render(
         request,
@@ -139,10 +140,12 @@ def student_dashboard(request):
                 "active": active_borrows,
                 "max_allowed": max_allowed,
                 "reserved": current_reserved,
+                "remaining": quota_remaining,
             },
             "search_query": search_query,
             "shared_mode": bool(request.user.profile.role == Profile.ROLE_STUDENT and group),
             "group_member_count": len(member_ids) if member_ids else 1,
+            "quota_remaining": quota_remaining,
         },
     )
 
@@ -164,6 +167,29 @@ def add_to_cart(request, component_id):
     except ValueError:
         quantity = 0
     component = get_object_or_404(Component, id=component_id)
+
+    max_allowed = getattr(settings, "STUDENT_MAX_ACTIVE", 10)
+    if max_allowed:
+        if request.user.profile.role == Profile.ROLE_STUDENT and member_ids:
+            reserved_total = (
+                Reservation.objects.filter(user_id__in=member_ids, is_active=True)
+                .aggregate(total=Sum("quantity"))
+                .get("total")
+                or 0
+            )
+        else:
+            reserved_total = (
+                Reservation.objects.filter(user=request.user, is_active=True)
+                .aggregate(total=Sum("quantity"))
+                .get("total")
+                or 0
+            )
+        if reserved_total + quantity > max_allowed:
+            messages.error(
+                request,
+                f"Limit reached: Max {max_allowed} active reservations. Current reserved {reserved_total}.",
+            )
+            return redirect("student_dashboard")
 
     if quantity <= 0:
         messages.error(request, "Quantity must be greater than zero.")
@@ -246,8 +272,10 @@ def view_cart(request):
         {
             "reservations": reservations,
             "faculties": faculties,
+            "group": group,
             "shared_mode": bool(request.user.profile.role == Profile.ROLE_STUDENT and group),
             "is_faculty_user": request.user.profile.role == Profile.ROLE_FACULTY,
+            "preassigned_faculty": getattr(group, "faculty", None) if group else None,
         },
     )
 
@@ -304,7 +332,7 @@ def generate_slip(request):
     is_faculty_user = request.user.profile.role == Profile.ROLE_FACULTY
     faculty_id = request.POST.get("faculty", "").strip()
     project_title = request.POST.get("project_title", "").strip()
-    if not is_faculty_user and not faculty_id:
+    if not is_faculty_user and not faculty_id and not (group and group.faculty_id):
         messages.error(request, "Select a faculty in-charge.")
         return redirect("view_cart")
     if not project_title:
@@ -318,6 +346,8 @@ def generate_slip(request):
                 faculty_user = Profile.objects.select_related("user").get(
                     id=int(faculty_id), role=Profile.ROLE_FACULTY
                 ).user
+            elif group and group.faculty:
+                faculty_user = group.faculty
         except (Profile.DoesNotExist, ValueError):
             faculty_user = None
     if not faculty_user:
@@ -399,7 +429,7 @@ def admin_components(request):
     if search_query:
         components = components.filter(name__icontains=search_query)
     if stock_filter == "low":
-        components = components.filter(available_stock__lte=2)
+        components = components.filter(available_stock__gt=0, available_stock__lte=2)
     elif stock_filter == "out":
         components = components.filter(available_stock=0)
     categories = Component.objects.values_list("category", flat=True).distinct()

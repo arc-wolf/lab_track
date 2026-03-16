@@ -1,10 +1,13 @@
 from datetime import timedelta
+import logging
 
 from celery import shared_task
 from django.utils import timezone
 from django.core.mail import send_mail
 
 from .models import BorrowRequest
+
+logger = logging.getLogger(__name__)
 
 
 @shared_task
@@ -22,20 +25,25 @@ def send_due_reminders():
     )
 
     for req in qs:
-        recipients = []
+        recipients = set()
         if req.user.email:
-            recipients.append(req.user.email)
+            recipients.add(req.user.email)
+        if req.faculty and req.faculty.email:
+            recipients.add(req.faculty.email)
+        if req.group and req.group.faculty and req.group.faculty.email:
+            recipients.add(req.group.faculty.email)
         subject = "LabTrack return reminder"
         body = (
             f"Your borrow request #{req.id} is due on {req.due_date}. "
             f"Please return the components or contact lab admin."
         )
-        try:
-            if recipients:
-                send_mail(subject, body, None, recipients, fail_silently=True)
-        finally:
-            req.reminder_sent = True
-            req.save(update_fields=["reminder_sent"])
+        if recipients:
+            try:
+                send_mail(subject, body, None, list(recipients), fail_silently=False)
+                req.reminder_sent = True
+                req.save(update_fields=["reminder_sent"])
+            except Exception as exc:  # pragma: no cover - log delivery issues
+                logger.warning("Reminder email failed for request %s: %s", req.id, exc)
     return f"Processed {qs.count()} reminders"
 
 

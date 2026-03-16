@@ -30,7 +30,7 @@
             <label class="form-label small text-muted">Stock State</label>
             <select name="stock" class="form-select">
                 <option value="">All</option>
-                <option value="low" {% if stock_filter == 'low' %}selected{% endif %}>Low Stock (<=2)</option>
+                <option value="low" {% if stock_filter == 'low' %}selected{% endif %}>Low Stock (1-2)</option>
                 <option value="out" {% if stock_filter == 'out' %}selected{% endif %}>Out of Stock</option>
             </select>
         </div>

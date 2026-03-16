@@ -7,6 +7,10 @@
             gap: 0.55rem !important;
         }
     }
+    .password-wrap .toggle-password {
+        min-width: 72px;
+        font-weight: 600;
+    }
 </style>
 <div class="row justify-content-center">
     <div class="col-12 signup-shell">
@@ -82,12 +86,18 @@
             <div class="row g-3">
                 <div class="col-md-6">
                     <label class="form-label">Password</label>
-                    {{ form.password1 }}
+                    <div class="input-group password-wrap">
+                        {{ form.password1 }}
+                        <button type="button" class="btn btn-outline-secondary toggle-password" data-target="id_password1">Show</button>
+                    </div>
                     {{ form.password1.errors }}
                 </div>
                 <div class="col-md-6">
                     <label class="form-label">Confirm Password</label>
-                    {{ form.password2 }}
+                    <div class="input-group password-wrap">
+                        {{ form.password2 }}
+                        <button type="button" class="btn btn-outline-secondary toggle-password" data-target="id_password2">Show</button>
+                    </div>
                     {{ form.password2.errors }}
                 </div>
             </div>
@@ -128,9 +138,21 @@
                         {{ form.semester.errors }}
                     </div>
                     <div class="col-md-4">
-                        <label class="form-label">Class</label>
+                        <label class="form-label">Program</label>
                         {{ form.student_class }}
                         {{ form.student_class.errors }}
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Branch</label>
+                        {{ form.branch }}
+                        {{ form.branch.errors }}
+                    </div>
+                </div>
+                <div class="row g-3 mt-1">
+                    <div class="col-md-4">
+                        <label class="form-label">Batch</label>
+                        {{ form.batch_year }}
+                        {{ form.batch_year.errors }}
                     </div>
                     <div class="col-md-4 create-group-only">
                         <label class="form-label">Group Name</label>
@@ -247,6 +269,20 @@
         groupModeInputs.forEach(r => r.addEventListener('change', toggleGroupMode));
         classify();
         toggleGroupMode();
+    })();
+</script>
+<script>
+    (() => {
+        document.querySelectorAll('.toggle-password').forEach((btn) => {
+            btn.addEventListener('click', () => {
+                const targetId = btn.getAttribute('data-target');
+                const input = document.getElementById(targetId);
+                if (!input) return;
+                const show = input.type === 'password';
+                input.type = show ? 'text' : 'password';
+                btn.textContent = show ? 'Hide' : 'Show';
+            });
+        });
     })();
 </script>
 {% endblock %}

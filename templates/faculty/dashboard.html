@@ -16,47 +16,13 @@
     </div>
 </section>
 
-<div class="row g-3 mb-4">
-    <div class="col-md-3">
-        <div class="card h-100">
-            <div class="card-body">
-                <p class="text-muted mb-2">Active Requests</p>
-                <div class="d-flex align-items-center gap-3">
-                    <span class="glow-dot"></span>
-                    <div>
-                        <div class="stat-number fs-2">{{ total_active }}</div>
-                        <small class="text-muted">Pending + Approved</small>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card h-100">
-            <div class="card-body">
-                <p class="text-muted mb-2">Awaiting Return</p>
-                <div class="stat-number fs-2">{{ awaiting_return }}</div>
-                <small class="text-muted">Approved, not yet returned</small>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card h-100">
-            <div class="card-body">
-                <p class="text-muted mb-2">Returned</p>
-                <div class="stat-number fs-4">{{ stats.returned|default:0 }}</div>
-                <small class="text-muted">Closed with condition</small>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card h-100">
-            <div class="card-body">
-                <p class="text-muted mb-2">Rejected</p>
-                <div class="stat-number fs-4">{{ stats.rejected|default:0 }}</div>
-                <small class="text-muted">Declined or withdrawn</small>
-            </div>
-        </div>
+<div class="glass-panel p-3 mb-4">
+    <div class="d-flex flex-wrap align-items-center gap-2">
+        <span class="small text-muted me-2">Quick stats</span>
+        <a href="{% url 'faculty_dashboard' %}" class="btn btn-sm btn-outline-secondary">Active Requests: {{ total_active }}</a>
+        <a href="{% url 'faculty_dashboard' %}?status=APPROVED" class="btn btn-sm btn-outline-secondary">Awaiting Return: {{ awaiting_return }}</a>
+        <a href="{% url 'faculty_dashboard' %}?status=RETURNED" class="btn btn-sm btn-outline-secondary">Returned: {{ stats.returned|default:0 }}</a>
+        <a href="{% url 'faculty_dashboard' %}?status=REJECTED" class="btn btn-sm btn-outline-secondary">Rejected: {{ stats.rejected|default:0 }}</a>
     </div>
 </div>
 

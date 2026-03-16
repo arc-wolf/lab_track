@@ -13,7 +13,7 @@ from django.utils import timezone
 
 from inventory.models import Component
 from users.models import Profile
-from users.models import Group
+from users.models import Group, GroupMember
 
 from .models import BorrowRequest, BorrowItem, LabPolicy
 from .services.borrow_service import (
@@ -907,12 +907,11 @@ def download_slip(request, request_id):
     # permission: student owner, faculty assigned, or admin
     profile = getattr(request.user, "profile", None)
     role = getattr(profile, "role", None)
-    same_student_group = (
-        role == Profile.ROLE_STUDENT
-        and slip.group_id is not None
-        and profile is not None
-        and (profile.group_id or "").upper() == (slip.group.code or "").upper()
-    )
+    same_student_group = False
+    if role == Profile.ROLE_STUDENT and slip.group_id and profile and profile.group_id:
+        same_code = (profile.group_id or "").upper() == (slip.group.code or "").upper()
+        if same_code:
+            same_student_group = GroupMember.objects.filter(group=slip.group, user=request.user).exists()
     if not (
         slip.user == request.user
         or slip.faculty == request.user

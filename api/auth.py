@@ -26,7 +26,8 @@ def token_auth_required(view_func):
         max_age_days = int(getattr(settings, "API_TOKEN_MAX_AGE_DAYS", 30))
         idle_timeout_seconds = int(getattr(settings, "API_TOKEN_IDLE_TIMEOUT_SECONDS", 1209600))
 
-        if token.created_at and (now - token.created_at).days > max_age_days:
+        expires_at = token.expires_at or (token.created_at + timezone.timedelta(days=max_age_days))
+        if expires_at and now > expires_at:
             return JsonResponse({'error': 'Token expired.'}, status=401)
         if token.last_used_at and (now - token.last_used_at).total_seconds() > idle_timeout_seconds:
             return JsonResponse({'error': 'Token expired.'}, status=401)

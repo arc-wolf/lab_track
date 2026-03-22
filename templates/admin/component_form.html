@@ -7,19 +7,19 @@
         {{ form.non_field_errors }}
         <div class="row g-3">
             <div class="col-md-6">
-                <label class="form-label">Name</label>
+                <label class="form-label" for="{{ form.name.id_for_label }}">Name</label>
                 {{ form.name }}
                 {{ form.name.errors }}
             </div>
             <div class="col-md-6">
-                <label class="form-label">Category</label>
+                <label class="form-label" for="{{ form.category.id_for_label }}">Category</label>
                 {{ form.category }}
                 {{ form.category.errors }}
             </div>
 
             <div class="col-md-6">
                 <div class="p-3 rounded-3 border border-0 shadow-sm h-100" style="background: rgba(255,255,255,0.04);">
-                    <label class="form-label d-flex justify-content-between">
+                    <label class="form-label d-flex justify-content-between" for="{{ form.total_stock.id_for_label }}">
                         <span>Total Stock</span>
                         <span class="badge bg-light text-dark">Overall capacity</span>
                     </label>
@@ -33,7 +33,7 @@
 
             <div class="col-md-6">
                 <div class="p-3 rounded-3 border border-0 shadow-sm h-100" style="background: rgba(255,255,255,0.04);">
-                    <label class="form-label d-flex justify-content-between">
+                    <label class="form-label d-flex justify-content-between" for="{{ form.available_stock.id_for_label }}">
                         <span>Available Stock</span>
                         <span class="badge bg-success text-dark">Live</span>
                     </label>
@@ -47,7 +47,7 @@
 
             <div class="col-md-6">
                 <div class="p-3 rounded-3 border border-0 shadow-sm h-100" style="background: rgba(255,255,255,0.04);">
-                    <label class="form-label d-flex justify-content-between">
+                    <label class="form-label d-flex justify-content-between" for="{{ form.student_limit.id_for_label }}">
                         <span>Per Student Limit</span>
                         <span class="badge bg-warning text-dark">0 = no limit</span>
                     </label>
@@ -61,7 +61,7 @@
 
             <div class="col-md-6">
                 <div class="p-3 rounded-3 border border-0 shadow-sm h-100" style="background: rgba(255,255,255,0.04);">
-                    <label class="form-label d-flex justify-content-between">
+                    <label class="form-label d-flex justify-content-between" for="{{ form.faculty_limit.id_for_label }}">
                         <span>Per Faculty Limit</span>
                         <span class="badge bg-info text-dark">Active</span>
                     </label>
@@ -80,7 +80,7 @@
 
             <div class="col-md-6">
                 <div class="p-3 rounded-3 border border-0 shadow-sm h-100" style="background: rgba(255,255,255,0.04);">
-                    <label class="form-label d-flex justify-content-between">
+                    <label class="form-label d-flex justify-content-between" for="{{ form.fine_per_day.id_for_label }}">
                         <span>Overdue Fine (per day)</span>
                         <span class="badge bg-warning text-dark">Optional</span>
                     </label>
@@ -94,7 +94,7 @@
 
             <div class="col-md-6">
                 <div class="p-3 rounded-3 border border-0 shadow-sm h-100" style="background: rgba(255,255,255,0.04);">
-                    <label class="form-label d-flex justify-content-between">
+                    <label class="form-label d-flex justify-content-between" for="{{ form.fine_damaged.id_for_label }}">
                         <span>Damaged Fine</span>
                         <span class="badge bg-warning text-dark">Optional</span>
                     </label>
@@ -108,7 +108,7 @@
 
             <div class="col-md-6">
                 <div class="p-3 rounded-3 border border-0 shadow-sm h-100" style="background: rgba(255,255,255,0.04);">
-                    <label class="form-label d-flex justify-content-between">
+                    <label class="form-label d-flex justify-content-between" for="{{ form.fine_missing_parts.id_for_label }}">
                         <span>Missing Parts Fine</span>
                         <span class="badge bg-warning text-dark">Optional</span>
                     </label>
@@ -122,7 +122,7 @@
 
             <div class="col-md-6">
                 <div class="p-3 rounded-3 border border-0 shadow-sm h-100" style="background: rgba(255,255,255,0.04);">
-                    <label class="form-label d-flex justify-content-between">
+                    <label class="form-label d-flex justify-content-between" for="{{ form.fine_not_working.id_for_label }}">
                         <span>Not Working Fine</span>
                         <span class="badge bg-warning text-dark">Optional</span>
                     </label>

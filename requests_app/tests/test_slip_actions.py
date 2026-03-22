@@ -62,7 +62,7 @@ class SlipActionTests(TestCase):
         self.assertRedirects(response, reverse("admin_requests_console"), fetch_redirect_response=False)
 
     def test_mark_returned_restores_stock(self):
-        slip = self._make_slip(status=BorrowRequest.STATUS_APPROVED, faculty=self.faculty, quantity=3)
+        slip = self._make_slip(status=BorrowRequest.STATUS_ISSUED, faculty=self.faculty, quantity=3)
         self.component.available_stock = 2
         self.component.save(update_fields=["available_stock"])
         self.client.login(username="admin", password="pass")

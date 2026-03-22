@@ -375,6 +375,7 @@ Whenever any functionality changes:
   - Action required: configure shared cache (e.g., Redis) for production.
 
 ## 10) Change Log (append-only, newest first)
+- 2026-03-22: Added admin Excel import/export services (pandas-based stock sync + inventory/requests workbook download) and minimal admin-only AI assistant endpoint backed by read-only context.
 - 2026-03-05: Hardened profile integrity across roles: unique editable username, alphabet-only full name, India 10-digit phone validation, student/faculty email lock after verification, and admin email-change OTP flow with post-verify lock.
 - 2026-03-05: Added admin write APIs for policy and per-component fine overrides (`/api/admin/policy/`, `/api/admin/policy/update/`, `/api/admin/components/<id>/fines/`) and updated API tests/docs.
 - 2026-03-05: Refined lab-admin decision logic (priority inbox + urgent-first glimpse) and aligned `/api/admin/overview/` payload with new operational fields (`pending_groups_count`, `priority_items`).

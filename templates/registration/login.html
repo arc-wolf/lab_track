@@ -29,7 +29,7 @@
                 Your account does not have access to that page.
             </div>
             {% endif %}
-            <form method="post" class="mb-3">
+            <form method="post" class="mb-3" id="loginForm">
                 {% csrf_token %}
                 <div class="mb-3">
                     <label class="form-label">Full Name or Email</label>
@@ -60,7 +60,7 @@
                     <div class="text-danger small mt-1">{{ form.password.errors|striptags }}</div>
                     {% endif %}
                 </div>
-                <button class="btn btn-primary w-100">Login</button>
+                <button class="btn btn-primary w-100" id="loginSubmit" disabled>Login</button>
             </form>
             <div class="d-flex justify-content-between align-items-center flex-wrap auth-link-row">
                 <a href="{% url 'password_reset' %}" class="small text-decoration-none">Forgot password?</a>
@@ -81,6 +81,20 @@
                 btn.textContent = show ? 'Hide' : 'Show';
             });
         });
+
+        // Disable submit until both fields are filled
+        const form = document.getElementById('loginForm');
+        const usernameInput = form?.querySelector('input[name="{{ form.username.html_name }}"]');
+        const passwordInput = form?.querySelector('input[name="{{ form.password.html_name }}"]');
+        const submitBtn = document.getElementById('loginSubmit');
+        const toggleState = () => {
+            if (!submitBtn || !usernameInput || !passwordInput) return;
+            const ready = Boolean(usernameInput.value.trim()) && Boolean(passwordInput.value.trim());
+            submitBtn.disabled = !ready;
+        };
+        usernameInput?.addEventListener('input', toggleState);
+        passwordInput?.addEventListener('input', toggleState);
+        toggleState();
     })();
 </script>
 {% endblock %}

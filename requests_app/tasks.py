@@ -18,7 +18,7 @@ def send_due_reminders():
     now = timezone.now().date()
     target_date = now + timedelta(days=5)  # 40th day -> 5 days before 45-day due
     qs = BorrowRequest.objects.filter(
-        status__in=[BorrowRequest.STATUS_APPROVED, BorrowRequest.STATUS_ISSUED],
+        status__in=[BorrowRequest.STATUS_ISSUED],
         reminder_sent=False,
         due_date__isnull=False,
         due_date=target_date,
@@ -53,7 +53,7 @@ def update_overdue_requests():
     Move approved/issued requests to overdue once due date passes.
     """
     qs = BorrowRequest.objects.filter(
-        status__in=[BorrowRequest.STATUS_APPROVED, BorrowRequest.STATUS_ISSUED],
+        status__in=[BorrowRequest.STATUS_ISSUED],
         due_date__isnull=False,
     )
     updated = 0

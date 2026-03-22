@@ -1,6 +1,6 @@
 # LabTrack Django Master Tutorial (Project Anatomy Edition)
 
-Last updated: March 6, 2026
+Last updated: March 22, 2026
 
 ## 0) Read This First
 This tutorial is designed to teach Django by dissecting the LabTrack project itself.
@@ -156,8 +156,9 @@ erDiagram
 - `inventory/apps.py`, `inventory/admin.py`: app + admin config.
 - `inventory/models.py`: `Component`, `CartItem`, `Reservation` and stock constraints.
 - `inventory/forms.py`: component admin forms and validation.
-- `inventory/views.py`: student inventory/cart/requests and admin component CRUD.
+- `inventory/views.py`: student inventory/cart/requests and admin component CRUD + Excel import/export endpoints.
 - `inventory/tasks.py`: reservation cleanup scheduler task.
+- `inventory/services/excel_service.py`: pandas-driven Excel import/export for components + request snapshot.
 - `inventory/urls.py`: inventory route map.
 - `inventory/tests.py`: base checks.
 - `inventory/migrations/*`: category/limits/indexes/fine fields migration chain.
@@ -181,7 +182,7 @@ erDiagram
 ### 6.6 `api/`
 - `api/auth.py`: token extraction/auth middleware-style decorator logic.
 - `api/serializers.py`: payload shaping for profile/components/requests.
-- `api/views.py`: token issue/logout, profile, components, requests, admin API operations.
+- `api/views.py`: token issue/logout, profile, components, requests, admin API operations, AI assistant query.
 - `api/urls.py`: API endpoint map with inline contracts.
 - `api/tests.py`: API contract/security/access/rate-limit tests.
 
@@ -225,6 +226,11 @@ erDiagram
 - `GET /api/admin/policy/`
 - `POST /api/admin/policy/update/`
 - `POST /api/admin/components/<id>/fines/`
+- `POST /api/ai/query/` (admin-only AI assistant)
+
+### 7.3 Admin Excel Utilities
+- `POST /inventory/import-excel/` (admin-only; accepts Excel file with columns: name, category, total_stock; sets available_stock = total_stock using update_or_create)
+- `GET /inventory/export-excel/` (admin-only; downloads workbook with Inventory + Requests sheets)
 
 ## 8) How to Read Every Line of This Project (Method)
 You asked for line-level mastery. The fastest practical method is structured reading:
@@ -315,9 +321,9 @@ Outcome:
 
 ### 10.5 API Expansion
 Change:
-- Added admin overview/policy/fines endpoints with role checks.
+- Added admin overview/policy/fines endpoints with role checks; added admin AI assistant and Excel import/export APIs.
 Outcome:
-- Mobile/external clients can perform operational reads/writes safely.
+- Mobile/external clients can perform operational reads/writes safely; admins can bulk sync stock and query AI assistant for quick context.
 
 ## 11) Possible Future Adaptations and How to Achieve
 

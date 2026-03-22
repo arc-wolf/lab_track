@@ -63,4 +63,10 @@ urlpatterns = [
     # Auth: token required + admin role
     # Body: fine_per_day/fine_damaged/fine_missing_parts/fine_not_working (int or null)
     path('admin/components/<int:component_id>/fines/', views.admin_update_component_fines, name='api_admin_update_component_fines'),
+
+    # POST /api/ai/query/
+    # Headers: Authorization: Token <token>
+    # Auth: token required + admin role
+    # Body: {"query":"<question>"} -> {"answer":"..."}
+    path('ai/query/', views.ai_query, name='api_ai_query'),
 ]

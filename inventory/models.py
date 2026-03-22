@@ -2,6 +2,8 @@ from django.contrib.auth.models import User
 from django.db import models, transaction
 from django.utils import timezone
 
+from users.models import Group
+
 
 class Component(models.Model):
     name = models.CharField(max_length=200)
@@ -77,3 +79,20 @@ class Reservation(models.Model):
             locked.is_active = False
             locked.save(update_fields=["is_active"])
             locked.component.adjust_available(int(locked.quantity))
+
+
+class GroupCartLock(models.Model):
+    group = models.OneToOneField(Group, on_delete=models.CASCADE, related_name="cart_lock")
+    locked_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name="group_cart_locks")
+    locked_at = models.DateTimeField(auto_now=True)
+    expires_at = models.DateTimeField()
+
+    class Meta:
+        indexes = [models.Index(fields=["expires_at"], name="inventory_g_expires_ae31c8_idx")]
+
+    def __str__(self):
+        return f"Cart lock for {self.group.code} by {self.locked_by.username}"
+
+    def is_active(self, now=None):
+        now = now or timezone.now()
+        return self.expires_at > now

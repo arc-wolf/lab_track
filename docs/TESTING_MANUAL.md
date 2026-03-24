@@ -56,6 +56,7 @@
 - Admin: low-stock list (< =2), pending requests, due today.
 - Faculty: pending group approvals, pending slips, due today for their requests.
 - Student: sees own/group requests list.
+- Due-today should include only collected/active request stages (`ISSUED`, `OVERDUE`, `PENALTY`), not merely approved-but-not-collected slips.
 
 ### 7. Due-Date Reminders
 - Set due_date to today+5 and reminder_sent=False; run `send_due_reminders`; emails queued to student and faculty (group faculty if present); reminder_sent flips True.

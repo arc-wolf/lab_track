@@ -460,6 +460,7 @@ def admin_component_create(request):
         if form.is_valid():
             form.save()
             cache.delete("inventory_categories_v1")
+            cache.delete("api_components_v1")
             messages.success(request, "Component added.")
             return redirect("admin_components")
     else:
@@ -479,6 +480,7 @@ def admin_component_edit(request, pk):
         if form.is_valid():
             form.save()
             cache.delete("inventory_categories_v1")
+            cache.delete("api_components_v1")
             messages.success(request, "Component updated.")
             return redirect("admin_components")
     else:
@@ -497,6 +499,7 @@ def admin_component_delete(request, pk):
         try:
             component.delete()
             cache.delete("inventory_categories_v1")
+            cache.delete("api_components_v1")
         except ProtectedError:
             messages.error(
                 request,
@@ -530,6 +533,7 @@ def admin_import_excel(request):
         return JsonResponse({"error": "Import failed. Check file format."}, status=500)
 
     cache.delete("inventory_categories_v1")
+    cache.delete("api_components_v1")
     return JsonResponse({"status": "success", "created": result["created"], "updated": result["updated"]})
 
 

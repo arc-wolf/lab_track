@@ -7,11 +7,16 @@ from django.urls import reverse
 
 from inventory.models import Component
 from requests_app.models import BorrowAction, BorrowRequest, BorrowRequestItem
+from requests_app.tasks import send_due_reminders
 from users.models import Group, GroupMember, Profile
 
 
 def make_user(username: str, role: str) -> User:
-    user = User.objects.create_user(username=username, password="pass")
+    user = User.objects.create_user(
+        username=username,
+        password="pass",
+        email=f"{username}@example.com",
+    )
     profile = user.profile
     profile.role = role
     profile.save(update_fields=["role"])
@@ -149,3 +154,15 @@ class SlipActionTests(TestCase):
         self.assertIsNotNone(action)
         self.assertIn("INR 25", action.note)
         self.assertRedirects(response, reverse("admin_requests_console"), fetch_redirect_response=False)
+
+    def test_send_due_reminders_reports_processed_count(self):
+        slip = self._make_slip(status=BorrowRequest.STATUS_ISSUED, faculty=self.faculty, quantity=1)
+        slip.due_date = timezone.now().date() + timedelta(days=5)
+        slip.reminder_sent = False
+        slip.save(update_fields=["due_date", "reminder_sent"])
+
+        result = send_due_reminders()
+
+        slip.refresh_from_db()
+        self.assertTrue(slip.reminder_sent)
+        self.assertEqual(result, "Processed 1 reminders")

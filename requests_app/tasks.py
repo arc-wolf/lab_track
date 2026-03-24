@@ -24,7 +24,9 @@ def send_due_reminders():
         due_date=target_date,
     )
 
+    processed = 0
     for req in qs:
+        processed += 1
         recipients = set()
         if req.user.email:
             recipients.add(req.user.email)
@@ -44,13 +46,13 @@ def send_due_reminders():
                 req.save(update_fields=["reminder_sent"])
             except Exception as exc:  # pragma: no cover - log delivery issues
                 logger.warning("Reminder email failed for request %s: %s", req.id, exc)
-    return f"Processed {qs.count()} reminders"
+    return f"Processed {processed} reminders"
 
 
 @shared_task
 def update_overdue_requests():
     """
-    Move approved/issued requests to overdue once due date passes.
+    Move issued requests to overdue once due date passes.
     """
     qs = BorrowRequest.objects.filter(
         status__in=[BorrowRequest.STATUS_ISSUED],

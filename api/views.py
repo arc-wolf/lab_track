@@ -310,6 +310,7 @@ def admin_update_component_fines(request, component_id: int):
     if not touched:
         return JsonResponse({'error': 'No fine fields provided.'}, status=400)
     component.save(update_fields=touched)
+    cache.delete("api_components_v1")
     return JsonResponse({'component': serialize_component(component)})
 
 

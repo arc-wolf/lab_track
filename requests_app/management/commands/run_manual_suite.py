@@ -120,7 +120,7 @@ class Command(BaseCommand):
         try:
             slip.due_date = timezone.now().date() + datetime.timedelta(days=5)
             slip.reminder_sent = False
-            slip.status = BorrowRequest.STATUS_APPROVED
+            slip.status = BorrowRequest.STATUS_ISSUED
             slip.save(update_fields=["due_date", "reminder_sent", "status"])
             send_due_reminders()
             slip.refresh_from_db()

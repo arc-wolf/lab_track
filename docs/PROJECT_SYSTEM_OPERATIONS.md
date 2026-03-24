@@ -1,6 +1,6 @@
 # LabTrack Project System Operations (Living Document)
 
-Last updated: March 5, 2026
+Last updated: March 24, 2026
 Owner: Engineering team
 
 ## 1) Purpose
@@ -25,6 +25,16 @@ This file must be updated on every functional code change.
 - `notifications`: role-wise alerts center.
 
 ## 4) Functionalities and Operations
+
+### 4.0 Recent Stability Fixes (March 24, 2026)
+- Reminder task accounting fixed:
+  - `requests_app.tasks.send_due_reminders` now reports true processed count even after rows are marked `reminder_sent=True`.
+- Due-today visibility corrected:
+  - Admin/faculty notification center now treats due-today as active collected slips (`ISSUED`, `OVERDUE`, `PENALTY`) instead of `APPROVED` (not yet collected).
+- Awaiting-return counters corrected:
+  - Faculty/admin queue contexts now compute awaiting-return from collected-active stages, not from `APPROVED`.
+- API component cache freshness improved:
+  - Component mutation paths now invalidate `api_components_v1` cache so API consumers see fine/stock edits immediately on next fetch.
 
 ### 4.1 Authentication, Signup, OTP, and Password Reset
 - Signup derives role by email domain:

@@ -201,6 +201,34 @@ class ApiAccessTests(TestCase):
         )
         self.assertEqual(response.status_code, 403)
 
+    def test_component_fine_update_invalidates_components_cache(self):
+        token = self._issue_token(self.admin.username)
+
+        first_read = self.client.get(
+            reverse('api_components'),
+            HTTP_AUTHORIZATION=f'Token {token}',
+            secure=True,
+        )
+        self.assertEqual(first_read.status_code, 200)
+        self.assertIsNone(first_read.json()['components'][0]['fine_per_day'])
+
+        update_response = self.client.post(
+            reverse('api_admin_update_component_fines', args=[self.component.id]),
+            data=json.dumps({'fine_per_day': 77}),
+            content_type='application/json',
+            HTTP_AUTHORIZATION=f'Token {token}',
+            secure=True,
+        )
+        self.assertEqual(update_response.status_code, 200)
+
+        second_read = self.client.get(
+            reverse('api_components'),
+            HTTP_AUTHORIZATION=f'Token {token}',
+            secure=True,
+        )
+        self.assertEqual(second_read.status_code, 200)
+        self.assertEqual(second_read.json()['components'][0]['fine_per_day'], 77)
+
     def test_admin_policy_get_and_update(self):
         token = self._issue_token(self.admin.username)
         read_response = self.client.get(

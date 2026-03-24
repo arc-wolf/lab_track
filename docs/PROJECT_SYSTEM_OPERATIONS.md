@@ -1,6 +1,6 @@
 # LabTrack Project System Operations (Living Document)
 
-Last updated: March 5, 2026
+Last updated: March 24, 2026
 Owner: Engineering team
 
 ## 1) Purpose
@@ -25,6 +25,16 @@ This file must be updated on every functional code change.
 - `notifications`: role-wise alerts center.
 
 ## 4) Functionalities and Operations
+
+### 4.0 Recent Stability Fixes (March 24, 2026)
+- Reminder task accounting fixed:
+  - `requests_app.tasks.send_due_reminders` now reports true processed count even after rows are marked `reminder_sent=True`.
+- Due-today visibility corrected:
+  - Admin/faculty notification center now treats due-today as active collected slips (`ISSUED`, `OVERDUE`, `PENALTY`) instead of `APPROVED` (not yet collected).
+- Awaiting-return counters corrected:
+  - Faculty/admin queue contexts now compute awaiting-return from collected-active stages, not from `APPROVED`.
+- API component cache freshness improved:
+  - Component mutation paths now invalidate `api_components_v1` cache so API consumers see fine/stock edits immediately on next fetch.
 
 ### 4.1 Authentication, Signup, OTP, and Password Reset
 - Signup derives role by email domain:
@@ -375,6 +385,7 @@ Whenever any functionality changes:
   - Action required: configure shared cache (e.g., Redis) for production.
 
 ## 10) Change Log (append-only, newest first)
+- 2026-03-22: Added admin Excel import/export services (pandas-based stock sync + inventory/requests workbook download) and minimal admin-only AI assistant endpoint backed by read-only context.
 - 2026-03-05: Hardened profile integrity across roles: unique editable username, alphabet-only full name, India 10-digit phone validation, student/faculty email lock after verification, and admin email-change OTP flow with post-verify lock.
 - 2026-03-05: Added admin write APIs for policy and per-component fine overrides (`/api/admin/policy/`, `/api/admin/policy/update/`, `/api/admin/components/<id>/fines/`) and updated API tests/docs.
 - 2026-03-05: Refined lab-admin decision logic (priority inbox + urgent-first glimpse) and aligned `/api/admin/overview/` payload with new operational fields (`pending_groups_count`, `priority_items`).

@@ -7,13 +7,22 @@ from django.core.cache import cache
 from django.db import transaction
 from django.db.models.deletion import ProtectedError
 from django.db.models import Q, Sum
+from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
-from requests_app.models import BorrowRequest, BorrowItem
+from requests_app.models import BorrowRequest
+from requests_app.services import get_requests_for_user
 from users.models import Group, GroupMember, Profile
 from .forms import ComponentForm
 from .models import Component, Reservation
+from .services.cart_service import (
+    CartAccessError,
+    assert_group_cart_access,
+    create_borrow_request_from_cart,
+    sync_group_cart_lock,
+)
+from .services import excel_service
 
 
 # --------- helpers ---------------------------------------------------------
@@ -94,7 +103,7 @@ def student_dashboard(request):
 
     category_filter = request.GET.get("category", "")
     search_query = request.GET.get("q", "").strip()
-    components = Component.objects.all()
+    components = Component.objects.all().order_by("-available_stock", "name")
     if category_filter:
         components = components.filter(category=category_filter)
     if search_query:
@@ -197,6 +206,12 @@ def add_to_cart(request, component_id):
 
     with transaction.atomic():
         locked = Component.objects.select_for_update().get(id=component.id)
+        if request.user.profile.role == Profile.ROLE_STUDENT and group:
+            try:
+                assert_group_cart_access(group, request.user)
+            except CartAccessError as exc:
+                messages.error(request, str(exc))
+                return redirect("student_dashboard")
         limit = locked.student_limit if request.user.profile.role == Profile.ROLE_STUDENT else locked.faculty_limit
         if locked.available_stock < quantity:
             messages.error(request, "Requested quantity exceeds available stock.")
@@ -221,6 +236,11 @@ def add_to_cart(request, component_id):
             existing.quantity = new_qty
             existing.expires_at = timezone.now() + timedelta(minutes=15)
             existing.save(update_fields=["quantity", "expires_at"])
+            if request.user.profile.role == Profile.ROLE_STUDENT and group:
+                all_reservations = list(
+                    Reservation.objects.filter(user_id__in=member_ids, is_active=True)
+                )
+                sync_group_cart_lock(group, request.user, all_reservations)
             messages.success(request, f"Updated team cart for {component.name} (now {new_qty}).")
             return redirect("student_dashboard")
 
@@ -235,6 +255,11 @@ def add_to_cart(request, component_id):
             expires_at=timezone.now() + timedelta(minutes=15),
             is_active=True,
         )
+        if request.user.profile.role == Profile.ROLE_STUDENT and group:
+            all_reservations = list(
+                Reservation.objects.filter(user_id__in=member_ids, is_active=True)
+            )
+            sync_group_cart_lock(group, request.user, all_reservations)
 
     messages.success(request, f"Reserved {quantity} x {component.name} for 15 minutes.")
     return redirect("student_dashboard")
@@ -252,6 +277,16 @@ def view_cart(request):
     if request.user.profile.role == Profile.ROLE_STUDENT and not is_group_approved:
         messages.error(request, "Group pending faculty approval. Borrowing is locked until approval.")
         return redirect("student_dashboard")
+    if request.user.profile.role == Profile.ROLE_STUDENT and group:
+        try:
+            with transaction.atomic():
+                group_reservations = list(
+                    Reservation.objects.filter(user_id__in=member_ids, is_active=True)
+                )
+                sync_group_cart_lock(group, request.user, group_reservations)
+        except CartAccessError as exc:
+            messages.error(request, str(exc))
+            return redirect("student_dashboard")
 
     if request.user.profile.role == Profile.ROLE_STUDENT and member_ids:
         reservations = (
@@ -301,7 +336,21 @@ def remove_cart_item(request, reservation_id):
     else:
         res = get_object_or_404(Reservation, id=reservation_id, user=request.user, is_active=True)
     with transaction.atomic():
+        if request.user.profile.role == Profile.ROLE_STUDENT and group:
+            member_reservations = list(
+                Reservation.objects.filter(user_id__in=member_ids, is_active=True)
+            )
+            try:
+                sync_group_cart_lock(group, request.user, member_reservations)
+            except CartAccessError as exc:
+                messages.error(request, str(exc))
+                return redirect("view_cart")
         res.expire_and_release()
+        if request.user.profile.role == Profile.ROLE_STUDENT and group:
+            remaining = list(
+                Reservation.objects.filter(user_id__in=member_ids, is_active=True)
+            )
+            sync_group_cart_lock(group, request.user, remaining)
     messages.info(request, "Reservation removed and stock restored.")
     return redirect("view_cart")
 
@@ -329,62 +378,19 @@ def generate_slip(request):
         messages.error(request, "Your cart is empty or reservations expired.")
         return redirect("view_cart")
 
-    is_faculty_user = request.user.profile.role == Profile.ROLE_FACULTY
-    faculty_id = request.POST.get("faculty", "").strip()
     project_title = request.POST.get("project_title", "").strip()
-    if not is_faculty_user and not faculty_id and not (group and group.faculty_id):
-        messages.error(request, "Select a faculty in-charge.")
-        return redirect("view_cart")
     if not project_title:
         messages.error(request, "Project title is required.")
         return redirect("view_cart")
-
-    faculty_user = request.user if is_faculty_user else None
-    if not is_faculty_user:
-        try:
-            if faculty_id:
-                faculty_user = Profile.objects.select_related("user").get(
-                    id=int(faculty_id), role=Profile.ROLE_FACULTY
-                ).user
-            elif group and group.faculty:
-                faculty_user = group.faculty
-        except (Profile.DoesNotExist, ValueError):
-            faculty_user = None
-    if not faculty_user:
-        messages.error(request, "Selected faculty not found.")
-        return redirect("view_cart")
-    if group and group.faculty_id and group.faculty_id != faculty_user.id:
-        messages.error(request, "Selected faculty does not match your approved group in-charge.")
-        return redirect("view_cart")
-
-    with transaction.atomic():
-        first_reserved_at = min(res.reserved_at for res in reservations)
-        borrow_request = BorrowRequest.objects.create(
-            user=request.user,
-            faculty=faculty_user,
+    try:
+        create_borrow_request_from_cart(
+            actor=request.user,
             group=group,
             project_title=project_title,
-            cart_locked_at=first_reserved_at,
-            status=BorrowRequest.STATUS_PENDING,
         )
-        borrow_request.set_default_due()
-        borrow_request.save(update_fields=["due_date"])
-        from requests_app.models import BorrowAction
-        BorrowAction.objects.create(
-            borrow_request=borrow_request,
-            action=BorrowAction.ACTION_CREATED,
-            performed_by=request.user,
-        )
-
-        for res in reservations:
-            BorrowItem.objects.create(
-                borrow_request=borrow_request,
-                component=res.component,
-                quantity=res.quantity,
-            )
-            # Reservation is consumed by request creation; remove row to avoid
-            # stale inactive duplicates and keep cart table compact.
-            res.delete()
+    except CartAccessError as exc:
+        messages.error(request, str(exc))
+        return redirect("view_cart")
 
     messages.success(request, "Borrow slip generated. Awaiting approval.")
     return redirect("student_requests")
@@ -397,12 +403,9 @@ def student_requests(request):
         return redirect("dashboard")
 
     group, _ = _ensure_group(request.user)
-    if request.user.profile.role == Profile.ROLE_STUDENT and group:
-        slips_qs = BorrowRequest.objects.filter(group=group)
-    else:
-        slips_qs = BorrowRequest.objects.filter(user=request.user)
     slips = (
-        slips_qs.select_related("user", "faculty")
+        get_requests_for_user(request.user, BorrowRequest.objects.all())
+        .select_related("user", "faculty")
         .prefetch_related("items__component")
         .order_by("-created_at")
     )
@@ -457,6 +460,7 @@ def admin_component_create(request):
         if form.is_valid():
             form.save()
             cache.delete("inventory_categories_v1")
+            cache.delete("api_components_v1")
             messages.success(request, "Component added.")
             return redirect("admin_components")
     else:
@@ -476,6 +480,7 @@ def admin_component_edit(request, pk):
         if form.is_valid():
             form.save()
             cache.delete("inventory_categories_v1")
+            cache.delete("api_components_v1")
             messages.success(request, "Component updated.")
             return redirect("admin_components")
     else:
@@ -494,6 +499,7 @@ def admin_component_delete(request, pk):
         try:
             component.delete()
             cache.delete("inventory_categories_v1")
+            cache.delete("api_components_v1")
         except ProtectedError:
             messages.error(
                 request,
@@ -503,3 +509,45 @@ def admin_component_delete(request, pk):
         messages.warning(request, "Component removed.")
         return redirect("admin_components")
     return render(request, "admin/component_confirm_delete.html", {"component": component})
+
+
+@login_required
+def admin_import_excel(request):
+    if not _require_role(request.user, Profile.ROLE_ADMIN):
+        return JsonResponse({"error": "Admin role required."}, status=403)
+    if request.method != "POST":
+        return JsonResponse({"error": "POST required."}, status=405)
+
+    upload = request.FILES.get("file") or request.FILES.get("excel")
+    if not upload:
+        return JsonResponse({"error": "No Excel file provided."}, status=400)
+    filename = (getattr(upload, "name", "") or "").lower()
+    if not filename.endswith((".csv", ".xlsx")):
+        return JsonResponse({"error": "Invalid file"}, status=400)
+
+    try:
+        result = excel_service.import_components_from_excel(upload)
+    except excel_service.ExcelImportError as exc:
+        return JsonResponse({"error": str(exc)}, status=400)
+    except Exception:
+        return JsonResponse({"error": "Import failed. Check file format."}, status=500)
+
+    cache.delete("inventory_categories_v1")
+    cache.delete("api_components_v1")
+    return JsonResponse({"status": "success", "created": result["created"], "updated": result["updated"]})
+
+
+@login_required
+def admin_export_excel(request):
+    if not _require_role(request.user, Profile.ROLE_ADMIN):
+        return JsonResponse({"error": "Admin role required."}, status=403)
+    if request.method != "GET":
+        return JsonResponse({"error": "GET required."}, status=405)
+
+    data, filename = excel_service.export_inventory_and_requests()
+    response = HttpResponse(
+        data,
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+    response["Content-Disposition"] = f'attachment; filename="{filename}"'
+    return response

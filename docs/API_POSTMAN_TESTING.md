@@ -1,6 +1,6 @@
 # LabTrack API Guide for Postman
 
-Last updated: March 5, 2026
+Last updated: March 24, 2026
 
 ## 1) Base Setup
 - Base URL (local): `http://127.0.0.1:8000/api`
@@ -22,6 +22,10 @@ Recommended Postman environment variables:
 - `GET {{base_url}}/admin/policy/` -> read global penalty/maintenance policy
 - `POST {{base_url}}/admin/policy/update/` -> update global policy parameters
 - `POST {{base_url}}/admin/components/<id>/fines/` -> update per-component fine overrides
+
+Behavior notes:
+- `GET /components/` response is cached briefly for performance.
+- Admin-side component updates (web inventory CRUD/import and `POST /admin/components/<id>/fines/`) now invalidate this cache immediately so clients see fresh stock/fine values on the next call.
 
 ## 3) Detailed Postman Requests
 

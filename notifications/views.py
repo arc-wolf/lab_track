@@ -20,7 +20,12 @@ def notifications_center(request):
         low_stock = Component.objects.filter(available_stock__lte=2).order_by("available_stock", "name")
         pending = BorrowRequest.objects.filter(status=BorrowRequest.STATUS_PENDING).order_by("-created_at")
         due_today = BorrowRequest.objects.filter(
-            status=BorrowRequest.STATUS_APPROVED, due_date=date.today()
+            status__in=[
+                BorrowRequest.STATUS_ISSUED,
+                BorrowRequest.STATUS_OVERDUE,
+                BorrowRequest.STATUS_PENALTY,
+            ],
+            due_date=date.today(),
         ).select_related("user", "faculty")
         context.update(
             {
@@ -49,7 +54,15 @@ def notifications_center(request):
             .order_by("-created_at")
         )
         my_due = (
-            BorrowRequest.objects.filter(faculty=request.user, status=BorrowRequest.STATUS_APPROVED, due_date=date.today())
+            BorrowRequest.objects.filter(
+                faculty=request.user,
+                status__in=[
+                    BorrowRequest.STATUS_ISSUED,
+                    BorrowRequest.STATUS_OVERDUE,
+                    BorrowRequest.STATUS_PENALTY,
+                ],
+                due_date=date.today(),
+            )
             .select_related("user")
             .order_by("due_date")
         )

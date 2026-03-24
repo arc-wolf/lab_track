@@ -121,7 +121,7 @@ class BorrowRequest(models.Model):
             )
 
     def reject(self, by_user, note=""):
-        if self.status not in (self.STATUS_PENDING, self.STATUS_APPROVED):
+        if self.status != self.STATUS_PENDING:
             raise ValueError("Invalid status transition")
         with transaction.atomic():
             self.status = self.STATUS_REJECTED
@@ -147,7 +147,7 @@ class BorrowRequest(models.Model):
             )
 
     def mark_returned(self, by_user, condition: str = None):
-        if self.status not in (self.STATUS_APPROVED, self.STATUS_ISSUED, self.STATUS_OVERDUE, self.STATUS_PENALTY):
+        if self.status not in (self.STATUS_ISSUED, self.STATUS_OVERDUE, self.STATUS_PENALTY):
             raise ValueError("Invalid status transition")
         with transaction.atomic():
             self.status = self.STATUS_RETURNED
@@ -175,7 +175,7 @@ class BorrowRequest(models.Model):
             )
 
     def auto_mark_overdue(self):
-        if self.status in (self.STATUS_APPROVED, self.STATUS_ISSUED) and self.due_date and timezone.now().date() > self.due_date:
+        if self.status == self.STATUS_ISSUED and self.due_date and timezone.now().date() > self.due_date:
             with transaction.atomic():
                 self.status = self.STATUS_OVERDUE
                 self.save(update_fields=["status"])

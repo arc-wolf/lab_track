@@ -11,7 +11,9 @@ from django.views.decorators.http import require_GET, require_POST
 from django.views.decorators.csrf import csrf_exempt
 
 from inventory.models import Component
+from core.services import ai_service
 from requests_app.models import BorrowItem, BorrowRequest, LabPolicy
+from requests_app.services import get_requests_for_user
 from users.models import APIToken, Group, Profile
 
 from .auth import token_auth_required
@@ -125,21 +127,8 @@ def components(request):
 @token_auth_required
 def borrow_requests(request):
     user = request.api_user
-    profile = getattr(user, 'profile', None)
-    role = getattr(profile, 'role', '')
-
     slips = BorrowRequest.objects.select_related('user', 'faculty', 'group').prefetch_related('items__component')
-
-    if role == Profile.ROLE_ADMIN:
-        queryset = slips.order_by('-created_at')[:100]
-    elif role == Profile.ROLE_FACULTY:
-        queryset = slips.filter(faculty=user).order_by('-created_at')[:100]
-    else:
-        group = Group.objects.filter(code__iexact=(profile.group_id or '')).first() if profile else None
-        if group:
-            queryset = slips.filter(group=group).order_by('-created_at')[:100]
-        else:
-            queryset = slips.filter(user=user).order_by('-created_at')[:100]
+    queryset = get_requests_for_user(user, slips).order_by('-created_at')[:100]
 
     return JsonResponse({'requests': [serialize_borrow_request(slip) for slip in queryset]})
 
@@ -321,4 +310,25 @@ def admin_update_component_fines(request, component_id: int):
     if not touched:
         return JsonResponse({'error': 'No fine fields provided.'}, status=400)
     component.save(update_fields=touched)
+    cache.delete("api_components_v1")
     return JsonResponse({'component': serialize_component(component)})
+
+
+@csrf_exempt
+@require_POST
+@token_auth_required
+def ai_query(request):
+    admin_error = _admin_required_or_403(request)
+    if admin_error:
+        return admin_error
+
+    payload = _parse_json(request)
+    if payload is None:
+        return JsonResponse({'error': 'Invalid JSON body.'}, status=400)
+
+    query = (payload.get("query") or payload.get("q") or "").strip()
+    if not query:
+        return JsonResponse({'error': 'query is required.'}, status=400)
+
+    answer = ai_service.answer_query(query)
+    return JsonResponse({'answer': answer})

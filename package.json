@@ -1,0 +1,31 @@
+{
+  "name": "labtrack",
+  "version": "1.0.0",
+  "description": "IoT/Hardware lab management system for student teams, faculty approvals, and lab admin operations.",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "test": "npx playwright test",
+    "test:headed": "npx playwright test --headed",
+    "test:ui": "npx playwright test --ui",
+    "test:load": "k6 run tests/performance/load-test.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/arc-wolf/lab_track.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/arc-wolf/lab_track/issues"
+  },
+  "homepage": "https://github.com/arc-wolf/lab_track#readme",
+  "devDependencies": {
+    "@playwright/test": "^1.58.2",
+    "playwright": "^1.58.2",
+    "typescript": "^5.9.3"
+  }
+}

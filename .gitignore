@@ -5,10 +5,16 @@ __pycache__/
 *.pyd
 *.sqlite3
 db.sqlite3
+.pytest_cache/
 
 # Virtualenv
 venv/
 .venv/
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
 
 # Django static
 staticfiles/
@@ -16,6 +22,14 @@ media/
 
 # Celery beat schedule
 celerybeat-schedule*
+
+# Frontend / test artifacts
+node_modules/
+test-results/
+playwright-report/
+blob-report/
+coverage/
+mock_data.txt
 
 # VSCode / IDE
 .vscode/

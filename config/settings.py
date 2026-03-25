@@ -16,6 +16,7 @@ from pathlib import Path
 
 from celery.schedules import crontab
 from dotenv import load_dotenv
+from django.core.exceptions import ImproperlyConfigured
 
 CELERY_BEAT_SCHEDULE = {
     'cleanup-expired-cart-every-10-minutes': {
@@ -43,19 +44,23 @@ load_dotenv(BASE_DIR / ".env")
 
 ENVIRONMENT = os.getenv("DJANGO_ENV", "production")
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.getenv(
-    "DJANGO_SECRET_KEY",
-    "lbt!9cvq7g6e2l@#5!f8cbl12uwvud1p=w*1b9#0gi3q!t$z6o",
-)
-
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.getenv("DJANGO_DEBUG", "False").lower() == "true"
 # Auto-enable debug conveniences when using the built-in runserver locally
 if "runserver" in sys.argv and os.getenv("DJANGO_DEBUG") is None:
     DEBUG = True
 
-ALLOWED_HOSTS = os.getenv("DJANGO_ALLOWED_HOSTS", "127.0.0.1,localhost,testserver").split(",")
+# SECURITY WARNING: keep the secret key used in production secret!
+SECRET_KEY = os.getenv("DJANGO_SECRET_KEY")
+if not SECRET_KEY:
+    if DEBUG:
+        SECRET_KEY = "dev-insecure-key-change-before-prod"
+    else:
+        raise ImproperlyConfigured("DJANGO_SECRET_KEY must be set when DEBUG=False.")
+
+ALLOWED_HOSTS = [h.strip() for h in os.getenv("DJANGO_ALLOWED_HOSTS", "127.0.0.1,localhost,testserver").split(",") if h.strip()]
+CSRF_TRUSTED_ORIGINS = [h.strip() for h in os.getenv("DJANGO_CSRF_TRUSTED_ORIGINS", "").split(",") if h.strip()]
+TRUST_X_FORWARDED_FOR = os.getenv("DJANGO_TRUST_X_FORWARDED_FOR", "False").lower() == "true"
 
 # Security hardening (HTTPS + cookies)
 _default_ssl_redirect = not DEBUG
@@ -70,6 +75,11 @@ SECURE_HSTS_PRELOAD = not DEBUG
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 SESSION_COOKIE_SECURE = os.getenv("DJANGO_SESSION_COOKIE_SECURE", "True" if not DEBUG else "False").lower() == "true"
 CSRF_COOKIE_SECURE = os.getenv("DJANGO_CSRF_COOKIE_SECURE", "True" if not DEBUG else "False").lower() == "true"
+SESSION_COOKIE_HTTPONLY = True
+CSRF_COOKIE_HTTPONLY = os.getenv("DJANGO_CSRF_COOKIE_HTTPONLY", "False").lower() == "true"
+SECURE_CONTENT_TYPE_NOSNIFF = True
+SECURE_REFERRER_POLICY = os.getenv("DJANGO_SECURE_REFERRER_POLICY", "same-origin")
+X_FRAME_OPTIONS = os.getenv("DJANGO_X_FRAME_OPTIONS", "DENY")
 
 
 # Application definition

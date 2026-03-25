@@ -440,6 +440,116 @@
             background: var(--glass);
             color: var(--text);
         }
+        .guide-step-title {
+            font-weight: 700;
+            font-size: 1.05rem;
+        }
+        .guide-step-text {
+            color: var(--muted);
+            white-space: pre-line;
+        }
+        .guide-progress-track {
+            height: 6px;
+            border-radius: 999px;
+            background: color-mix(in srgb, var(--surface) 65%, transparent);
+            overflow: hidden;
+            border: 1px solid var(--glass-stroke);
+        }
+        .guide-progress-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, var(--amrita-gold), var(--amrita-primary));
+            transition: width 0.25s ease;
+        }
+        .tutorial-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 1200;
+            display: none;
+        }
+        .tutorial-overlay.active {
+            display: block;
+        }
+        .tutorial-backdrop {
+            position: absolute;
+            inset: 0;
+            background: rgba(10, 13, 30, 0.62);
+            pointer-events: auto;
+        }
+        .tutorial-spotlight {
+            position: fixed;
+            border: 2px solid var(--amrita-gold);
+            border-radius: 14px;
+            box-shadow: 0 0 0 9999px rgba(6, 8, 20, 0.66), 0 0 0 8px rgba(246, 195, 67, 0.2);
+            pointer-events: none;
+            transition: all 0.2s ease;
+        }
+        .tutorial-pointer {
+            position: fixed;
+            width: 18px;
+            height: 18px;
+            border-radius: 999px;
+            background: var(--amrita-gold);
+            box-shadow: 0 0 0 0 rgba(246, 195, 67, 0.7);
+            pointer-events: none;
+            animation: tutorialPulse 1.2s infinite;
+            transition: all 0.2s ease;
+        }
+        @keyframes tutorialPulse {
+            0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(246, 195, 67, 0.65); }
+            70% { transform: scale(1.02); box-shadow: 0 0 0 18px rgba(246, 195, 67, 0); }
+            100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(246, 195, 67, 0); }
+        }
+        .tutorial-card {
+            position: fixed;
+            width: min(360px, calc(100vw - 24px));
+            max-height: calc(100vh - 24px);
+            overflow: auto;
+            display: flex;
+            flex-direction: column;
+            background: var(--modal-bg);
+            color: var(--modal-fg);
+            border: 1px solid var(--glass-stroke);
+            border-radius: 14px;
+            box-shadow: 0 22px 46px rgba(0, 0, 0, 0.35);
+            padding: 14px;
+            transition: all 0.2s ease;
+            bottom: 10px;
+            bottom: max(10px, env(safe-area-inset-bottom, 10px));
+            right: 10px;
+            top: auto;
+            left: auto;
+            transform: none;
+        }
+        .tutorial-actions {
+            position: sticky;
+            bottom: -14px;
+            background: var(--modal-bg);
+            border-top: 1px solid var(--glass-stroke);
+            margin: 10px -14px -14px -14px;
+            padding: 10px 14px calc(12px + env(safe-area-inset-bottom, 0px)) 14px;
+            z-index: 2;
+        }
+        @media (max-width: 767px) {
+            .tutorial-card {
+                width: calc(100vw - 12px);
+                left: 6px !important;
+                right: 6px;
+                bottom: 8px;
+                bottom: max(8px, env(safe-area-inset-bottom, 8px));
+                top: auto !important;
+                transform: none !important;
+                max-height: min(52vh, 420px);
+                border-radius: 16px;
+                padding-bottom: 12px;
+                padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+            }
+            .tutorial-actions {
+                bottom: -12px;
+                margin-left: -14px;
+                margin-right: -14px;
+            }
+        }
         .modal .text-muted {
             color: var(--muted) !important;
         }
@@ -481,6 +591,9 @@
     </div>
     <div class="d-flex align-items-center gap-2">
         {% if request.user.is_authenticated %}
+            <button id="open-guide" class="nav-icon-btn" title="Start Tutorial Mode" aria-label="Start Tutorial Mode">
+                <i class="bi bi-mortarboard"></i>
+            </button>
             <a class="position-relative nav-icon-btn text-decoration-none" href="{% url 'notifications' %}" title="Notifications">
                 <i class="bi bi-bell"></i>
                 <span class="notif-badge" id="notifBadge">!</span>
@@ -521,6 +634,36 @@
     {% block content %}
     {% endblock %}
 </div>
+{% if request.user.is_authenticated %}
+<div id="tutorialOverlay" class="tutorial-overlay" aria-hidden="true">
+    <div class="tutorial-backdrop"></div>
+    <div id="tutorialSpotlight" class="tutorial-spotlight d-none"></div>
+    <div id="tutorialPointer" class="tutorial-pointer d-none"></div>
+    <div id="tutorialCard" class="tutorial-card">
+        <div class="d-flex align-items-center justify-content-between mb-2">
+            <h5 class="mb-0 d-flex align-items-center gap-2">
+                <i class="bi bi-compass"></i>
+                <span id="guideTitle">Tutorial Mode</span>
+            </h5>
+            <button type="button" class="btn-close" id="guideCloseBtn" aria-label="Close"></button>
+        </div>
+        <div class="small text-muted mb-2" id="guideCounter">Step 1 of 1</div>
+        <div class="guide-progress-track mb-3">
+            <div class="guide-progress-fill" id="guideProgress"></div>
+        </div>
+        <div class="guide-step-title mb-2" id="guideStepTitle"></div>
+        <div class="guide-step-text mb-3" id="guideStepText"></div>
+        <a href="{% url 'dashboard' %}" class="btn btn-sm btn-outline-secondary d-none mb-3" id="guideActionLink">Open Section</a>
+        <div class="d-flex justify-content-between tutorial-actions">
+            <button type="button" class="btn btn-secondary btn-sm" id="guidePrevBtn">Previous</button>
+            <div class="d-flex gap-2">
+                <button type="button" class="btn btn-outline-secondary btn-sm" id="guideSkipBtn">Skip</button>
+                <button type="button" class="btn btn-primary btn-sm" id="guideNextBtn">Next</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
 
 </body>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
@@ -591,5 +734,337 @@
         });
     })();
 </script>
+{% if request.user.is_authenticated %}
+<script>
+    (() => {
+        const role = "{{ request.user.profile.role|default:''|escapejs }}";
+        const username = "{{ request.user.username|default:''|escapejs }}";
+        if (!role || !username) return;
+
+        const guideByRole = {
+            student: {
+                title: "Student Tutorial",
+                steps: [
+                    {
+                        title: "Component Dashboard",
+                        text: "Browse available components, filter by category, and search by name. This is your main starting point for borrowing.",
+                        href: "{% url 'student_dashboard' %}",
+                        label: "Open Dashboard",
+                        selector: "a[href='{% url 'student_dashboard' %}'], .navbar-brand"
+                    },
+                    {
+                        title: "Team Console",
+                        text: "Open Team Console to view members, leader role, and removal workflows. Team approval status controls borrowing access.",
+                        href: "{% url 'student_group_console' %}",
+                        label: "Open Team Console",
+                        selector: "a[href='{% url 'student_group_console' %}']"
+                    },
+                    {
+                        title: "Shared Cart",
+                        text: "Reserve items in cart, review expiry timers, and submit a slip with project title. Reservations lock stock immediately.",
+                        href: "{% url 'view_cart' %}",
+                        label: "Open Cart",
+                        selector: "a[href='{% url 'view_cart' %}']"
+                    },
+                    {
+                        title: "Request History",
+                        text: "Track your group or personal slips through pending, approved, collected, overdue, penalty, and returned stages.",
+                        href: "{% url 'student_requests' %}",
+                        label: "Open Requests",
+                        selector: "a[href='{% url 'student_requests' %}']"
+                    },
+                    {
+                        title: "Profile & Notifications",
+                        text: "Keep your profile updated and monitor notifications for approvals, due dates, and request status changes.",
+                        href: "{% url 'student_profile_console' %}",
+                        label: "Open Profile",
+                        selector: "a[href='{% url 'notifications' %}']"
+                    }
+                ]
+            },
+            faculty: {
+                title: "Faculty Tutorial",
+                steps: [
+                    {
+                        title: "Faculty Dashboard",
+                        text: "Review assigned slips, filter queue by status, and inspect action history before making approval decisions.",
+                        href: "{% url 'faculty_dashboard' %}",
+                        label: "Open Faculty Dashboard",
+                        selector: "a[href='{% url 'faculty_dashboard' %}']"
+                    },
+                    {
+                        title: "Approve or Reject Slips",
+                        text: "Pending requests under your assignment can be approved or rejected with remarks for transparency.",
+                        href: "{% url 'faculty_dashboard' %}?status=PENDING",
+                        label: "Open Pending Slips",
+                        selector: "a[href='{% url 'faculty_dashboard' %}?status=PENDING']"
+                    },
+                    {
+                        title: "Group Approval",
+                        text: "Approve or reject student groups assigned to you. Student borrowing remains blocked until group approval.",
+                        href: "{% url 'faculty_groups' %}",
+                        label: "Open Group Approvals",
+                        selector: "a[href='{% url 'faculty_groups' %}']"
+                    },
+                    {
+                        title: "Borrow Visibility",
+                        text: "Use collected, overdue, and returned views to monitor operational compliance and return timelines.",
+                        href: "{% url 'faculty_dashboard' %}?status=ISSUED",
+                        label: "Open Collected Slips",
+                        selector: "a[href='{% url 'faculty_dashboard' %}?status=ISSUED']"
+                    },
+                    {
+                        title: "Profile & Notifications",
+                        text: "Manage profile details and use the bell icon for due-today and pending action visibility.",
+                        href: "{% url 'faculty_profile_console' %}",
+                        label: "Open Profile",
+                        selector: "a[href='{% url 'notifications' %}']"
+                    }
+                ]
+            },
+            admin: {
+                title: "Admin Tutorial",
+                steps: [
+                    {
+                        title: "Overview Dashboard",
+                        text: "Use dashboard for high-level decisions only, then jump into dedicated consoles for execution.",
+                        href: "{% url 'admin_dashboard' %}",
+                        label: "Open Admin Dashboard",
+                        selector: "a[href='{% url 'admin_dashboard' %}']"
+                    },
+                    {
+                        title: "Request Console",
+                        text: "Process slip lifecycle transitions: approve, reject, mark collected, return, and penalty handling.",
+                        href: "{% url 'admin_requests_console' %}",
+                        label: "Open Request Console",
+                        selector: "a[href='{% url 'admin_requests_console' %}']"
+                    },
+                    {
+                        title: "Inventory & Policy",
+                        text: "Maintain stock, limits, import/export data, and fine policy settings used by penalty calculations.",
+                        href: "{% url 'admin_components' %}",
+                        label: "Open Inventory Console",
+                        selector: "a[href='{% url 'admin_components' %}']"
+                    },
+                    {
+                        title: "Maintenance & Analytics",
+                        text: "Track damaged/flagged returns, risky components, and trend insights for operational planning.",
+                        href: "{% url 'admin_maintenance_console' %}",
+                        label: "Open Maintenance Queue",
+                        selector: "a[href='{% url 'admin_maintenance_console' %}']"
+                    },
+                    {
+                        title: "Reports & Profile",
+                        text: "Use reports for summary metrics and keep admin profile secured, especially email verification and password updates.",
+                        href: "{% url 'admin_reports_console' %}",
+                        label: "Open Reports Console",
+                        selector: "a[href='{% url 'notifications' %}']"
+                    }
+                ]
+            }
+        };
+
+        const guide = guideByRole[role];
+        if (!guide) return;
+
+        const openBtn = document.getElementById("open-guide");
+        const overlay = document.getElementById("tutorialOverlay");
+        const spotlight = document.getElementById("tutorialSpotlight");
+        const pointer = document.getElementById("tutorialPointer");
+        const card = document.getElementById("tutorialCard");
+        if (!overlay || !openBtn || !spotlight || !pointer || !card) return;
+
+        const guideTitle = document.getElementById("guideTitle");
+        const guideCounter = document.getElementById("guideCounter");
+        const guideProgress = document.getElementById("guideProgress");
+        const guideStepTitle = document.getElementById("guideStepTitle");
+        const guideStepText = document.getElementById("guideStepText");
+        const guideActionLink = document.getElementById("guideActionLink");
+        const prevBtn = document.getElementById("guidePrevBtn");
+        const nextBtn = document.getElementById("guideNextBtn");
+        const skipBtn = document.getElementById("guideSkipBtn");
+        const closeBtn = document.getElementById("guideCloseBtn");
+        const steps = guide.steps || [];
+        if (!steps.length) return;
+        let idx = 0;
+        let active = false;
+        let targetEl = null;
+        let rafId = 0;
+
+        const storageKey = `labtrack_guide_seen_v1_${username}_${role}`;
+        const setSeen = () => {
+            try { localStorage.setItem(storageKey, "1"); } catch (_) {}
+        };
+        const isSeen = () => {
+            try { return localStorage.getItem(storageKey) === "1"; } catch (_) { return false; }
+        };
+
+        const hideSpotlight = () => {
+            spotlight.classList.add("d-none");
+            pointer.classList.add("d-none");
+            spotlight.style.width = "0px";
+            spotlight.style.height = "0px";
+        };
+
+        const isVisibleElement = (el) => {
+            if (!el) return false;
+            const style = window.getComputedStyle(el);
+            if (style.display === "none" || style.visibility === "hidden") return false;
+            const rect = el.getBoundingClientRect();
+            return rect.width > 1 && rect.height > 1;
+        };
+
+        const resolveTargetElement = (step) => {
+            if (!step || !step.selector) return null;
+            const candidates = document.querySelectorAll(step.selector);
+            for (const candidate of candidates) {
+                if (isVisibleElement(candidate)) return candidate;
+            }
+            return null;
+        };
+
+        const ensureTargetInView = () => {
+            if (!targetEl || !targetEl.scrollIntoView) return;
+            const rect = targetEl.getBoundingClientRect();
+            const viewportH = window.innerHeight;
+            const viewportW = window.innerWidth;
+            const outsideVertical = rect.top < 8 || rect.bottom > viewportH - 8;
+            const outsideHorizontal = rect.left < 8 || rect.right > viewportW - 8;
+            if (outsideVertical || outsideHorizontal) {
+                try {
+                    targetEl.scrollIntoView({ block: "center", inline: "center", behavior: "smooth" });
+                } catch (_) {
+                    targetEl.scrollIntoView();
+                }
+            }
+        };
+
+        const schedulePosition = () => {
+            if (!active) return;
+            if (rafId) cancelAnimationFrame(rafId);
+            rafId = requestAnimationFrame(() => {
+                rafId = 0;
+                positionCoachmark();
+            });
+        };
+
+        const positionCoachmark = () => {
+            if (!active) return;
+            const isMobile = window.matchMedia("(max-width: 767px)").matches;
+            if (!targetEl || !targetEl.getBoundingClientRect || !isVisibleElement(targetEl)) {
+                hideSpotlight();
+                return;
+            }
+
+            ensureTargetInView();
+            const rect = targetEl.getBoundingClientRect();
+            if (rect.width < 2 || rect.height < 2 || rect.bottom < 0 || rect.top > window.innerHeight) {
+                hideSpotlight();
+                return;
+            }
+
+            const pad = 8;
+            const margin = 8;
+            const top = Math.max(6, rect.top - pad);
+            const left = Math.max(6, rect.left - pad);
+            const width = Math.min(window.innerWidth - left - 6, rect.width + (pad * 2));
+            const height = Math.min(window.innerHeight - top - 6, rect.height + (pad * 2));
+
+            spotlight.classList.remove("d-none");
+            spotlight.style.top = `${top}px`;
+            spotlight.style.left = `${left}px`;
+            spotlight.style.width = `${width}px`;
+            spotlight.style.height = `${height}px`;
+
+            if (isMobile) {
+                pointer.classList.add("d-none");
+                return;
+            }
+
+            pointer.classList.remove("d-none");
+            pointer.style.top = `${Math.min(window.innerHeight - 24, top + height + 8)}px`;
+            pointer.style.left = `${Math.min(window.innerWidth - 24, left + width - 12)}px`;
+        };
+
+        const closeTutorial = (markSeen = true) => {
+            active = false;
+            if (markSeen) setSeen();
+            overlay.classList.remove("active");
+            overlay.setAttribute("aria-hidden", "true");
+            hideSpotlight();
+        };
+
+        const render = () => {
+            const total = steps.length;
+            const step = steps[idx];
+            guideTitle.textContent = guide.title;
+            guideCounter.textContent = `Step ${idx + 1} of ${total}`;
+            guideProgress.style.width = `${Math.round(((idx + 1) / total) * 100)}%`;
+            guideStepTitle.textContent = step.title || "";
+            guideStepText.textContent = step.text || "";
+            if (step.href) {
+                guideActionLink.href = step.href;
+                guideActionLink.textContent = step.label || "Open Section";
+                guideActionLink.classList.remove("d-none");
+            } else {
+                guideActionLink.classList.add("d-none");
+            }
+            prevBtn.disabled = idx === 0;
+            nextBtn.textContent = idx === total - 1 ? "Finish" : "Next";
+            targetEl = resolveTargetElement(step);
+            schedulePosition();
+        };
+
+        prevBtn.addEventListener("click", () => {
+            if (idx > 0) {
+                idx -= 1;
+                render();
+            }
+        });
+
+        nextBtn.addEventListener("click", () => {
+            if (idx < steps.length - 1) {
+                idx += 1;
+                render();
+                return;
+            }
+            closeTutorial(true);
+        });
+
+        skipBtn.addEventListener("click", () => closeTutorial(true));
+        closeBtn?.addEventListener("click", () => closeTutorial(true));
+        overlay.querySelector(".tutorial-backdrop")?.addEventListener("click", () => closeTutorial(true));
+
+        openBtn.addEventListener("click", () => {
+            active = true;
+            idx = 0;
+            overlay.classList.add("active");
+            overlay.setAttribute("aria-hidden", "false");
+            card.style.top = "auto";
+            card.style.left = "auto";
+            card.style.right = "10px";
+            card.style.bottom = "10px";
+            card.style.transform = "none";
+            render();
+        });
+
+        window.addEventListener("resize", schedulePosition);
+        window.addEventListener("scroll", schedulePosition, { passive: true });
+        window.addEventListener("orientationchange", schedulePosition);
+        const observer = new MutationObserver(() => schedulePosition());
+        observer.observe(document.body, { childList: true, subtree: true, attributes: true });
+        if (!isSeen() && !navigator.webdriver) {
+            setTimeout(() => {
+                if (active) return;
+                active = true;
+                idx = 0;
+                overlay.classList.add("active");
+                overlay.setAttribute("aria-hidden", "false");
+                render();
+            }, 450);
+        }
+    })();
+</script>
+{% endif %}
 {% block extra_js %}{% endblock %}
 </html>

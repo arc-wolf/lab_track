@@ -100,16 +100,10 @@ class SignupForm(UserCreationForm):
 
         base = slugify(full_name).replace("-", ".")[:130] or "user"
         candidate = base
-        import time
-        timestamp_suffix = int(time.time() % 10000)  # last 4 digits
         suffix = 1
         while User.objects.filter(username__iexact=candidate).exists():
-            if suffix > 100:
-                candidate = f"{base}.{timestamp_suffix}"[:150]
-                suffix = 1
-            else:
-                candidate = f"{base}.{suffix}"[:150]
             suffix += 1
+            candidate = f"{base}.{suffix}"[:150]
         return candidate
 
     def clean_email(self):

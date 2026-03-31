@@ -246,8 +246,7 @@ def faculty_dashboard(request):
         page_size = 10
 
     paginator = Paginator(slips_qs, page_size)
-    page_number = request.GET.get("page") or 1
-    page_obj = paginator.get_page(page_number)
+    page_obj = paginator.get_page(request.GET.get("page"))
 
     stats = slips_qs.aggregate(
         pending=Count("id", filter=Q(status=BorrowRequest.STATUS_PENDING)),
@@ -316,8 +315,7 @@ def _build_admin_queue_context(request):
         page_size = 10
 
     paginator = Paginator(slips_qs, page_size)
-    page_number = request.GET.get("page") or 1
-    page_obj = paginator.get_page(page_number)
+    page_obj = paginator.get_page(request.GET.get("page"))
 
     stats = BorrowRequest.objects.aggregate(
         pending=Count("id", filter=Q(status=BorrowRequest.STATUS_PENDING)),

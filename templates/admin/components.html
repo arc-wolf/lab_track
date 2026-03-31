@@ -37,14 +37,14 @@
 </div>
 
 <div class="glass-panel p-3 mb-3">
-    <form class="row g-2 align-items-end" method="GET" id="filterForm">
+    <form class="row g-2 align-items-end" method="GET">
         <div class="col-md-4">
             <label class="form-label small text-muted">Search Component</label>
-            <input type="text" name="q" value="{{ search_query }}" class="form-control" placeholder="Name contains..." data-live-filter>
+            <input type="text" name="q" value="{{ search_query }}" class="form-control" placeholder="Name contains...">
         </div>
         <div class="col-md-3">
             <label class="form-label small text-muted">Category</label>
-            <select name="category" class="form-select" data-live-filter>
+            <select name="category" class="form-select">
                 <option value="">All</option>
                 {% for cat in categories %}
                 <option value="{{ cat }}" {% if selected_category == cat %}selected{% endif %}>{{ cat }}</option>
@@ -53,14 +53,14 @@
         </div>
         <div class="col-md-3">
             <label class="form-label small text-muted">Stock State</label>
-            <select name="stock" class="form-select" data-live-filter>
+            <select name="stock" class="form-select">
                 <option value="">All</option>
                 <option value="low" {% if stock_filter == 'low' %}selected{% endif %}>Low Stock (1-2)</option>
                 <option value="out" {% if stock_filter == 'out' %}selected{% endif %}>Out of Stock</option>
             </select>
         </div>
         <div class="col-md-2 d-flex gap-2">
-            <button class="btn btn-secondary w-100" type="submit" style="opacity: 0.5;">Apply</button>
+            <button class="btn btn-secondary w-100" type="submit">Apply</button>
         </div>
     </form>
 </div>
@@ -87,84 +87,89 @@
                 <div class="out-of-stock-chip"><i class="bi bi-exclamation-triangle-fill"></i>Unavailable for borrowing</div>
                 {% endif %}
                 <div class="mt-auto d-flex gap-2">
-                    <a class="btn btn-sm btn-secondary" href="{% url 'admin_component_edit' component.id %}">Edit</a>
-                    <a class="btn btn-sm btn-danger" href="{% url 'admin_component_delete' component.id %}">Delete</a>
+                    <a class="btn btn-sm btn-secondary w-50" href="{% url 'admin_component_edit' component.id %}">Edit</a>
+                    <a class="btn btn-sm btn-danger w-50" href="{% url 'admin_component_delete' component.id %}">Delete</a>
                 </div>
             </div>
         </div>
     </div>
     {% empty %}
     <div class="col">
-        <div class="glass-panel p-3">No components yet. <a href="{% url 'admin_component_create' %}">Add first</a>.</div>
+        <div class="glass-panel p-3">No components yet.</div>
     </div>
     {% endfor %}
 </div>
 
-<!-- List view hidden per UX preference -->
+<div class="glass-panel p-3 mt-3">
+    <div class="table-responsive">
+        <table class="table align-middle mb-0">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Category</th>
+                    <th>Total</th>
+                    <th>Available</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for component in components %}
+                <tr>
+                    <td>{{ component.name }}</td>
+                    <td>{{ component.category }}</td>
+                    <td>{{ component.total_stock }}</td>
+                    <td>{{ component.available_stock }} available</td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="4">No components yet.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
 document.addEventListener('DOMContentLoaded', () => {
-    // Excel import
     const toggleBtn = document.getElementById('toggleImportPanel');
     const panel = document.getElementById('excelImportPanel');
-    const importForm = document.getElementById('excelImportForm');
+    const form = document.getElementById('excelImportForm');
     const status = document.getElementById('excelImportStatus');
 
     toggleBtn?.addEventListener('click', () => {
         panel?.classList.toggle('d-none');
     });
 
-    importForm?.addEventListener('submit', async (event) => {
+    form?.addEventListener('submit', async (event) => {
         event.preventDefault();
-        const fileInput = importForm.querySelector('input[type="file"]');
+        const fileInput = form.querySelector('input[type="file"]');
         if (!fileInput?.files?.length) {
             status.textContent = 'Select a file';
             return;
         }
+
         status.textContent = 'Uploading...';
-        const formData = new FormData(importForm);
+        const formData = new FormData(form);
         try {
             const response = await fetch("{% url 'inventory_import_excel' %}", {
                 method: 'POST',
                 body: formData,
                 headers: {
-                    'X-CSRFToken': importForm.querySelector('[name=csrfmiddlewaretoken]').value,
+                    'X-CSRFToken': form.querySelector('[name=csrfmiddlewaretoken]').value,
                 },
             });
             const payload = await response.json();
-            if (!response.ok) throw new Error(payload.error || 'Import failed.');
+            if (!response.ok) {
+                throw new Error(payload.error || 'Import failed.');
+            }
             status.textContent = `Imported: ${payload.created} new, ${payload.updated} updated`;
             window.location.reload();
         } catch (error) {
             status.textContent = error.message || 'Import failed';
         }
     });
-
-    // Live filtering
-    const filterForm = document.getElementById('filterForm');
-    const filterInputs = filterForm?.querySelectorAll('[data-live-filter]');
-    const applyBtn = filterForm?.querySelector('button[type="submit"]');
-    let debounceTimer;
-
-    filterInputs.forEach(input => {
-        input.addEventListener('input', () => {
-            clearTimeout(debounceTimer);
-            debounceTimer = setTimeout(() => {
-                filterForm.submit();
-            }, 300); // 300ms debounce for search
-        });
-        input.addEventListener('change', () => {
-            clearTimeout(debounceTimer);
-            debounceTimer = setTimeout(() => {
-                filterForm.submit();
-            }, 150); // 150ms for selects
-        });
-    });
-
-    applyBtn.style.opacity = '0.5';
-    applyBtn.title = 'Live filtering active';
 });
 </script>
 {% endblock %}

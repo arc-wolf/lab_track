@@ -184,15 +184,15 @@ def generate_borrow_slip_pdf(borrow_request_id):
         )
 
     actual_item_count = len(item_rows)
-    max_rows = 12  # Flexible: up to 12 items, pad if fewer
 
-    while len(item_rows) < max_rows:
+    # Keep fixed table height (10 body rows) while allowing selective separators.
+    while len(item_rows) < 10:
         item_rows.append([Paragraph("", styles["TableCell"]) for _ in headers])
 
-    data = [headers] + item_rows[:max_rows]
+    data = [headers] + item_rows[:10]
 
     col_widths = [25, 150, 35, 60, 60, 60, 70]
-    row_heights = [30] + [38] * max_rows
+    row_heights = [30] + [38] * 10
 
     table = Table(
         data,

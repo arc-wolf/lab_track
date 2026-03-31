@@ -385,6 +385,8 @@ Whenever any functionality changes:
   - Action required: configure shared cache (e.g., Redis) for production.
 
 ## 10) Change Log (append-only, newest first)
+- 2026-03-25: Updated docs/PROJECT_SYSTEM_OPERATIONS.md changelog for memory prompt hygiene update.
+- 2026-03-24: Updated `docs/PROJECT_MEMORY_PROMPT.md` for full project recreation capability (detailed snapshot, rules, blueprint map, setup/guardrails from changelog).
 - 2026-03-22: Added admin Excel import/export services (pandas-based stock sync + inventory/requests workbook download) and minimal admin-only AI assistant endpoint backed by read-only context.
 - 2026-03-05: Hardened profile integrity across roles: unique editable username, alphabet-only full name, India 10-digit phone validation, student/faculty email lock after verification, and admin email-change OTP flow with post-verify lock.
 - 2026-03-05: Added admin write APIs for policy and per-component fine overrides (`/api/admin/policy/`, `/api/admin/policy/update/`, `/api/admin/components/<id>/fines/`) and updated API tests/docs.

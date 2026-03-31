@@ -107,6 +107,7 @@
             color: var(--text) !important;
             background: var(--input-bg) !important;
             border: 1px solid var(--border) !important;
+            -webkit-text-fill-color: var(--text);
         }
         .input-group-text {
             color: var(--muted) !important;
@@ -116,11 +117,14 @@
         input::placeholder, textarea::placeholder {
             color: var(--placeholder) !important;
             opacity: 1;
+            -webkit-text-fill-color: var(--placeholder);
         }
         .neo-input:focus, .form-control:focus, .form-select:focus {
             outline: none;
             box-shadow: 0 0 0 0.18rem rgba(242, 193, 78, 0.25) !important;
             border-color: var(--amrita-gold) !important;
+            color: var(--text) !important;
+            -webkit-text-fill-color: var(--text);
         }
         .navbar {
             background: var(--nav-bg);
@@ -130,7 +134,9 @@
         .navbar-brand {
             font-weight: 700;
             letter-spacing: 0.5px;
-            color: #fff;
+            color: #fff !important;
+            -webkit-text-fill-color: #fff;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.3);
         }
         .nav-pill {
             padding: 0.45rem 0.95rem;
@@ -309,14 +315,21 @@
         }
         .alert-warning a { color: #fff; text-decoration: underline; }
         .table {
-            color: var(--text);
+            color: var(--text) !important;
         }
         .table thead {
             background: var(--table-head);
         }
         .table th {
-            color: var(--text);
+            background: rgba(0,0,0,0.2);
+            color: var(--text) !important;
+            -webkit-text-fill-color: var(--text) !important;
+            font-weight: 700;
             border-bottom-color: var(--border);
+        }
+        
+        :root[data-theme="dark"] .table th {
+            background: rgba(255,255,255,0.15);
         }
         .table td {
             border-color: var(--border);
@@ -328,7 +341,7 @@
             background: rgba(255, 255, 255, 0.86) !important;
             color: #111827 !important;
         }
-        :root[data-theme="dark"] .badge.bg-light {
+:root[data-theme="dark"] .badge.bg-light {
             background: rgba(255, 255, 255, 0.22) !important;
             color: #f8fafc !important;
         }
@@ -385,7 +398,10 @@
             font-size: 0.78rem;
             letter-spacing: 0.08em;
             text-transform: uppercase;
-            color: var(--amrita-gold);
+            color: var(--amrita-gold) !important;
+            -webkit-text-fill-color: var(--amrita-gold);
+            text-shadow: 0 1px 1px rgba(0,0,0,0.2);
+            font-weight: 600;
         }
         .neo-table {
             border-radius: 18px;

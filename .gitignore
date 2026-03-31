@@ -21,5 +21,15 @@ celerybeat-schedule*
 .vscode/
 .idea/
 
-# Migrations cache
+# Environment / Secrets
+.env
+.env.example
+.env*
+
+# Migrations cache / Logs
 *.log
+logs/
+
+# Node
+node_modules/
+npm-debug.log*

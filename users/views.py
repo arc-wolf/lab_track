@@ -33,9 +33,13 @@ FULL_NAME_REGEX = re.compile(r"^[A-Za-z ]+$")
 
 
 def _client_ip(request) -> str:
-    forwarded = request.META.get("HTTP_X_FORWARDED_FOR", "")
-    if forwarded:
-        return forwarded.split(",")[0].strip()
+    # Trust proxy-provided client IP only when explicitly enabled.
+    if getattr(settings, "TRUST_X_FORWARDED_FOR", False):
+        forwarded = request.META.get("HTTP_X_FORWARDED_FOR", "")
+        if forwarded:
+            first_hop = forwarded.split(",")[0].strip()
+            if first_hop:
+                return first_hop
     return request.META.get("REMOTE_ADDR", "unknown")
 
 

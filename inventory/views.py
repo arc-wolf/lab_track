@@ -2,6 +2,7 @@ from datetime import timedelta
 
 from django.conf import settings
 from django.contrib import messages
+from django.contrib.auth.models import User
 from django.contrib.auth.decorators import login_required
 from django.core.cache import cache
 from django.db import transaction
@@ -177,49 +178,63 @@ def add_to_cart(request, component_id):
         quantity = 0
     component = get_object_or_404(Component, id=component_id)
 
-    max_allowed = getattr(settings, "STUDENT_MAX_ACTIVE", 10)
-    if max_allowed:
-        if request.user.profile.role == Profile.ROLE_STUDENT and member_ids:
-            reserved_total = (
-                Reservation.objects.filter(user_id__in=member_ids, is_active=True)
-                .aggregate(total=Sum("quantity"))
-                .get("total")
-                or 0
-            )
-        else:
-            reserved_total = (
-                Reservation.objects.filter(user=request.user, is_active=True)
-                .aggregate(total=Sum("quantity"))
-                .get("total")
-                or 0
-            )
-        if reserved_total + quantity > max_allowed:
-            messages.error(
-                request,
-                f"Limit reached: Max {max_allowed} active reservations. Current reserved {reserved_total}.",
-            )
-            return redirect("student_dashboard")
-
     if quantity <= 0:
         messages.error(request, "Quantity must be greater than zero.")
         return redirect("student_dashboard")
 
+    max_allowed = getattr(settings, "STUDENT_MAX_ACTIVE", 10)
     with transaction.atomic():
-        locked = Component.objects.select_for_update().get(id=component.id)
+        locked_group = group
+        locked_member_ids = member_ids
         if request.user.profile.role == Profile.ROLE_STUDENT and group:
+            locked_group = Group.objects.select_for_update().get(id=group.id)
+            locked_member_ids = list(
+                GroupMember.objects.filter(group=locked_group).values_list("user_id", flat=True)
+            )
+        else:
+            # Serialize non-student cart mutations per user to avoid quota races.
+            User.objects.select_for_update().filter(id=request.user.id).exists()
+
+        locked = Component.objects.select_for_update().get(id=component.id)
+        if request.user.profile.role == Profile.ROLE_STUDENT and locked_group:
             try:
-                assert_group_cart_access(group, request.user)
+                assert_group_cart_access(locked_group, request.user)
             except CartAccessError as exc:
                 messages.error(request, str(exc))
                 return redirect("student_dashboard")
+
+        if max_allowed:
+            if request.user.profile.role == Profile.ROLE_STUDENT and locked_member_ids:
+                reserved_total = (
+                    Reservation.objects.select_for_update()
+                    .filter(user_id__in=locked_member_ids, is_active=True)
+                    .aggregate(total=Sum("quantity"))
+                    .get("total")
+                    or 0
+                )
+            else:
+                reserved_total = (
+                    Reservation.objects.select_for_update()
+                    .filter(user=request.user, is_active=True)
+                    .aggregate(total=Sum("quantity"))
+                    .get("total")
+                    or 0
+                )
+            if reserved_total + quantity > max_allowed:
+                messages.error(
+                    request,
+                    f"Limit reached: Max {max_allowed} active reservations. Current reserved {reserved_total}.",
+                )
+                return redirect("student_dashboard")
+
         limit = locked.student_limit if request.user.profile.role == Profile.ROLE_STUDENT else locked.faculty_limit
         if locked.available_stock < quantity:
             messages.error(request, "Requested quantity exceeds available stock.")
             return redirect("student_dashboard")
 
-        if request.user.profile.role == Profile.ROLE_STUDENT and member_ids:
+        if request.user.profile.role == Profile.ROLE_STUDENT and locked_member_ids:
             existing_qs = Reservation.objects.select_for_update().filter(
-                user_id__in=member_ids, component=locked, is_active=True
+                user_id__in=locked_member_ids, component=locked, is_active=True
             )
         else:
             existing_qs = Reservation.objects.select_for_update().filter(
@@ -236,11 +251,11 @@ def add_to_cart(request, component_id):
             existing.quantity = new_qty
             existing.expires_at = timezone.now() + timedelta(minutes=15)
             existing.save(update_fields=["quantity", "expires_at"])
-            if request.user.profile.role == Profile.ROLE_STUDENT and group:
+            if request.user.profile.role == Profile.ROLE_STUDENT and locked_group:
                 all_reservations = list(
-                    Reservation.objects.filter(user_id__in=member_ids, is_active=True)
+                    Reservation.objects.filter(user_id__in=locked_member_ids, is_active=True)
                 )
-                sync_group_cart_lock(group, request.user, all_reservations)
+                sync_group_cart_lock(locked_group, request.user, all_reservations)
             messages.success(request, f"Updated team cart for {component.name} (now {new_qty}).")
             return redirect("student_dashboard")
 
@@ -255,11 +270,11 @@ def add_to_cart(request, component_id):
             expires_at=timezone.now() + timedelta(minutes=15),
             is_active=True,
         )
-        if request.user.profile.role == Profile.ROLE_STUDENT and group:
+        if request.user.profile.role == Profile.ROLE_STUDENT and locked_group:
             all_reservations = list(
-                Reservation.objects.filter(user_id__in=member_ids, is_active=True)
+                Reservation.objects.filter(user_id__in=locked_member_ids, is_active=True)
             )
-            sync_group_cart_lock(group, request.user, all_reservations)
+            sync_group_cart_lock(locked_group, request.user, all_reservations)
 
     messages.success(request, f"Reserved {quantity} x {component.name} for 15 minutes.")
     return redirect("student_dashboard")

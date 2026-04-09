@@ -36,6 +36,13 @@ This file must be updated on every functional code change.
 - API component cache freshness improved:
   - Component mutation paths now invalidate `api_components_v1` cache so API consumers see fine/stock edits immediately on next fetch.
 
+### 4.00 One-Time Guided Onboarding (March 24, 2026)
+- A role-based guided tutorial modal now auto-runs once per authenticated user and role (`student`, `faculty`, `admin`).
+- Tutorial includes step-by-step “what you can do here” guidance with direct section links, similar to first-time game onboarding.
+- Users can reopen the guide anytime using the new navbar **Guide** (`?`) button.
+- One-time state is stored client-side using localStorage key format:
+  - `labtrack_guide_seen_v1_<username>_<role>`
+
 ### 4.1 Authentication, Signup, OTP, and Password Reset
 - Signup derives role by email domain:
   - `@am.students.amrita.edu` -> student

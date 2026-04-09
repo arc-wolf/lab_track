@@ -251,6 +251,7 @@ def faculty_dashboard(request):
     stats = slips_qs.aggregate(
         pending=Count("id", filter=Q(status=BorrowRequest.STATUS_PENDING)),
         approved=Count("id", filter=Q(status=BorrowRequest.STATUS_APPROVED)),
+        issued=Count("id", filter=Q(status=BorrowRequest.STATUS_ISSUED)),
         returned=Count("id", filter=Q(status=BorrowRequest.STATUS_RETURNED)),
         rejected=Count("id", filter=Q(status=BorrowRequest.STATUS_REJECTED)),
     )

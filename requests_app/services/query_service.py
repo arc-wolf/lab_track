@@ -15,6 +15,6 @@ def get_requests_for_user(user, queryset=None):
     group_code = (getattr(profile, "group_id", "") or "").strip()
     if group_code:
         group = Group.objects.filter(code__iexact=group_code).first()
-        if group:
+        if group and group.members.filter(user=user).exists():
             return queryset.filter(group=group)
     return queryset.filter(user=user)

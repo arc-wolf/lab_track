@@ -3,6 +3,11 @@ from django.urls import path
 from . import views
 
 urlpatterns = [
+    # GET /api/health/
+    # Auth: none
+    # Success: 200 -> {"status":"healthy","components":{"database":"ok","cache":"ok"},"environment":"production"}
+    path('health/', views.health_check, name='api_health_check'),
+
     # POST /api/auth/token/
     # Body(JSON): {"identity":"<username|email|full_name>","password":"<password>"}
     # Auth: none

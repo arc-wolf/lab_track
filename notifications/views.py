@@ -1,16 +1,12 @@
-from datetime import date
-
 from django.contrib.auth.decorators import login_required
-from django.db.models import Q
-from django.shortcuts import render, redirect
+from django.shortcuts import render
 
-from inventory.models import Component
-from requests_app.models import BorrowRequest
-from users.models import Group, Profile
+from .services.notification_service import build_notifications_context
 
 
 @login_required
 def notifications_center(request):
+<<<<<<< HEAD
     profile = getattr(request.user, "profile", None)
     role = getattr(profile, "role", None)
 
@@ -82,4 +78,8 @@ def notifications_center(request):
         )
         context.update({"my_requests": my_requests})
 
+=======
+    """Render notification center for authenticated users according to role."""
+    context = build_notifications_context(request.user)
+>>>>>>> e03ae81 (latest on 11aug2026)
     return render(request, "notifications/center.html", context)

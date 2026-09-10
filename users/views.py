@@ -27,45 +27,23 @@ from .forms import (
 from .models import EmailOTP, Group, GroupMember, GroupRemovalRequest, Profile
 from requests_app.models import BorrowRequest
 
-logger = logging.getLogger(__name__)
-PROFILE_PHONE_REGEX = re.compile(r"^\d{10}$")
-FULL_NAME_REGEX = re.compile(r"^[A-Za-z ]+$")
-
-
-def _client_ip(request) -> str:
-    forwarded = request.META.get("HTTP_X_FORWARDED_FOR", "")
-    if forwarded:
-        return forwarded.split(",")[0].strip()
-    return request.META.get("REMOTE_ADDR", "unknown")
-
-
-def _rate_limited(request, scope: str, identity: str, limit: int, window_seconds: int) -> bool:
-    raw = f"{scope}:{_client_ip(request)}:{(identity or '').strip().lower()}"
-    digest = hashlib.sha256(raw.encode("utf-8")).hexdigest()
-    key = f"rl:{digest}"
-    if cache.add(key, 1, timeout=window_seconds):
-        return False
-    try:
-        count = cache.incr(key)
-    except ValueError:
-        cache.set(key, 1, timeout=window_seconds)
-        count = 1
-    return count > limit
-
-
-def _faculty_user_for_value(raw_value: str):
-    value = (raw_value or "").strip()
-    if not value:
-        return None
-    return (
-        User.objects.filter(profile__role=Profile.ROLE_FACULTY)
-        .filter(
-            Q(username=value)
-            | Q(email__iexact=value)
-            | Q(profile__full_name__iexact=value)
-        )
-        .first()
-    )
+from .services.profile_service import (
+    client_ip as _client_ip,
+    is_rate_limited as _rate_limited,
+    faculty_user_for_value as _faculty_user_for_value,
+    normalize_and_validate_phone,
+    validate_email_uniqueness,
+    validate_username_uniqueness,
+    validate_full_name_format,
+    generate_otp_code as _generate_otp_code,
+    send_otp_email as _send_otp_email,
+)
+from .services.group_service import (
+    ensure_group_leader as _ensure_group_leader,
+    process_start_removal,
+    process_confirm_removal,
+    process_cancel_removal,
+)
 
 
 def _attach_legacy_groups_to_faculty(faculty_user):
@@ -80,44 +58,36 @@ def _attach_legacy_groups_to_faculty(faculty_user):
 
 
 def _validated_phone_or_message(request, raw_phone: str):
-    phone = normalize_phone(raw_phone)
-    if not phone or not PROFILE_PHONE_REGEX.match(phone):
+    phone = normalize_and_validate_phone(raw_phone)
+    if not phone:
         messages.error(request, "Enter a valid 10-digit mobile number.")
         return None
     return phone
 
 
 def _validated_email_or_message(request, user, raw_email: str):
-    email = (raw_email or "").strip().lower()
-    if not email:
-        messages.error(request, "Email cannot be empty.")
-        return None
-    if User.objects.filter(email__iexact=email).exclude(id=user.id).exists():
-        messages.error(request, "This email is already used by another account.")
+    email, err = validate_email_uniqueness(user, raw_email)
+    if err:
+        messages.error(request, err)
         return None
     return email
 
 
 def _validated_username_or_message(request, user, raw_username: str):
-    username = (raw_username or "").strip()
-    if not username:
-        messages.error(request, "Username cannot be empty.")
-        return None
-    if User.objects.filter(username__iexact=username).exclude(id=user.id).exists():
-        messages.error(request, "This username is already used by another account.")
+    username, err = validate_username_uniqueness(user, raw_username)
+    if err:
+        messages.error(request, err)
         return None
     return username
 
 
 def _validated_full_name_or_message(request, raw_full_name: str):
-    full_name = (raw_full_name or "").strip()
-    if not full_name:
-        messages.error(request, "Full name is required.")
+    full_name, err = validate_full_name_format(raw_full_name)
+    if err:
+        messages.error(request, err)
         return None
-    if not FULL_NAME_REGEX.match(full_name):
-        messages.error(request, "Full name must contain only alphabets and spaces.")
-        return None
-    return " ".join(full_name.split())
+    return full_name
+
 
 
 @login_required
@@ -723,93 +693,27 @@ def student_group_console(request):
 
         if action == "start_removal":
             target_user_id = request.POST.get("member_id")
-            target_member = get_object_or_404(GroupMember, group=group, user_id=target_user_id)
-            if target_member.role == GroupMember.ROLE_LEADER:
-                messages.error(request, "Team leader cannot be removed from this screen.")
-                return redirect("student_group_console")
-
-            if is_leader and target_member.user_id != request.user.id:
-                req, _ = GroupRemovalRequest.objects.get_or_create(
-                    group=group,
-                    member=target_member.user,
-                    status=GroupRemovalRequest.STATUS_PENDING,
-                    defaults={
-                        "initiated_by": GroupRemovalRequest.INITIATED_BY_LEADER,
-                        "leader_confirmed": True,
-                    },
-                )
-                if not req.leader_confirmed:
-                    req.leader_confirmed = True
-                    req.save(update_fields=["leader_confirmed"])
-                messages.info(request, f"Removal request started for {target_member.user.username}. Waiting member confirmation.")
-            elif target_member.user_id == request.user.id:
-                req, _ = GroupRemovalRequest.objects.get_or_create(
-                    group=group,
-                    member=request.user,
-                    status=GroupRemovalRequest.STATUS_PENDING,
-                    defaults={
-                        "initiated_by": GroupRemovalRequest.INITIATED_BY_MEMBER,
-                        "member_confirmed": True,
-                    },
-                )
-                if not req.member_confirmed:
-                    req.member_confirmed = True
-                    req.save(update_fields=["member_confirmed"])
-                messages.info(request, "Your self-removal request is created. Waiting team leader confirmation.")
+            ok, msg = process_start_removal(group, request.user, is_leader, target_user_id)
+            if ok:
+                messages.info(request, msg)
             else:
-                messages.error(request, "You are not authorized for this action.")
+                messages.error(request, msg)
 
         elif action == "confirm_removal":
             req_id = request.POST.get("request_id")
-            removal_req = get_object_or_404(
-                GroupRemovalRequest,
-                id=req_id,
-                group=group,
-                status=GroupRemovalRequest.STATUS_PENDING,
-            )
-
-            changed = False
-            if removal_req.member_id == request.user.id and not removal_req.member_confirmed:
-                removal_req.member_confirmed = True
-                changed = True
-            if is_leader and not removal_req.leader_confirmed:
-                removal_req.leader_confirmed = True
-                changed = True
-            if not changed:
-                messages.error(request, "No valid confirmation action available.")
-                return redirect("student_group_console")
-
-            if removal_req.member_confirmed and removal_req.leader_confirmed:
-                GroupMember.objects.filter(group=group, user=removal_req.member).delete()
-                member_profile = getattr(removal_req.member, "profile", None)
-                if member_profile and member_profile.group_id.upper() == group.code.upper():
-                    member_profile.group_id = ""
-                    member_profile.group_name = ""
-                    member_profile.faculty_incharge = ""
-                    member_profile.save(update_fields=["group_id", "group_name", "faculty_incharge"])
-                removal_req.status = GroupRemovalRequest.STATUS_APPROVED
-                removal_req.processed_at = timezone.now()
-                removal_req.save(update_fields=["member_confirmed", "leader_confirmed", "status", "processed_at"])
-                messages.success(request, f"{removal_req.member.username} has been removed from the team.")
+            ok, msg = process_confirm_removal(group, request.user, is_leader, req_id)
+            if ok:
+                messages.success(request, msg)
             else:
-                removal_req.save(update_fields=["member_confirmed", "leader_confirmed"])
-                messages.info(request, "Confirmation recorded. Waiting for the other party.")
+                messages.error(request, msg)
 
         elif action == "cancel_removal":
             req_id = request.POST.get("request_id")
-            removal_req = get_object_or_404(
-                GroupRemovalRequest,
-                id=req_id,
-                group=group,
-                status=GroupRemovalRequest.STATUS_PENDING,
-            )
-            if removal_req.member_id == request.user.id or is_leader:
-                removal_req.status = GroupRemovalRequest.STATUS_CANCELLED
-                removal_req.processed_at = timezone.now()
-                removal_req.save(update_fields=["status", "processed_at"])
-                messages.warning(request, "Removal request cancelled.")
+            ok, msg = process_cancel_removal(group, request.user, is_leader, req_id)
+            if ok:
+                messages.warning(request, msg)
             else:
-                messages.error(request, "Not authorized to cancel this request.")
+                messages.error(request, msg)
 
         return redirect("student_group_console")
 

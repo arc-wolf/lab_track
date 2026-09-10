@@ -251,3 +251,12 @@ class ApiAccessTests(TestCase):
         self.assertEqual(policy.per_day_fine, 99)
         self.assertEqual(policy.maintenance_keywords, 'service,damaged')
         self.assertEqual(policy.notes, 'updated')
+
+    def test_health_check_returns_200_ok(self):
+        response = self.client.get(reverse('api_health_check'))
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload['status'], 'healthy')
+        self.assertEqual(payload['components']['database'], 'ok')
+        self.assertEqual(payload['components']['cache'], 'ok')
+

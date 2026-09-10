@@ -35,5 +35,5 @@ vine==5.1.0
 openpyxl==3.1.5
 wcwidth==0.6.0
 weasyprint==68.1
-webencodings==0.5.1
-zopfli==0.4.1
+dj-database-url==2.3.0
+whitenoise==6.9.0

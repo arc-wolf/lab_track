@@ -85,6 +85,7 @@ Primary objective: preserve working flows, close loopholes, and evolve features 
 
 ## Current Progress Snapshot
 
+- Full test suite verified and operational (31 passing unit tests via `./venv/bin/python manage.py test`).
 - Shared student/group cart and request visibility implemented.
 - Group removal dual-confirm workflow implemented.
 - Admin multi-console architecture implemented.

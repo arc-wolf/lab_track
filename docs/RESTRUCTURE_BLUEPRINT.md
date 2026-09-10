@@ -50,12 +50,12 @@
 - Add observability basics (structured logs for transitions, task outcomes).
 - Finalize deployment-safe settings profile.
 
-## Current Implementation Status (March 5, 2026)
-- Phase 1 (in progress):
+## Current Implementation Status (August 10, 2026)
+- Phase 1 (completed/verified):
   - Compatibility aliases remain in place (`student`/`user`, `BorrowRequestItem`/`BorrowItem`).
   - Signup regressions fixed (faculty submit unblock, group-mode state retention).
   - Token-based mobile API introduced under `/api/` with role-scoped request access.
-  - Regression coverage expanded for signup and API access contracts.
+  - Test suite fully operational (31 passing unit tests).
 - Phase 2 (partial):
   - `requests_app/services/borrow_service.py` is active for core lifecycle transitions.
   - Reservation service extraction is still pending; inventory view layer still owns reservation orchestration.

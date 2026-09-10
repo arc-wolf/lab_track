@@ -1,6 +1,10 @@
 # LabTrack Project System Operations (Living Document)
 
+<<<<<<< HEAD
 Last updated: March 24, 2026
+=======
+Last updated: August 10, 2026
+>>>>>>> e03ae81 (latest on 11aug2026)
 Owner: Engineering team
 
 ## 1) Purpose
@@ -385,7 +389,16 @@ Whenever any functionality changes:
   - Action required: configure shared cache (e.g., Redis) for production.
 
 ## 10) Change Log (append-only, newest first)
+<<<<<<< HEAD
 - 2026-03-22: Added admin Excel import/export services (pandas-based stock sync + inventory/requests workbook download) and minimal admin-only AI assistant endpoint backed by read-only context.
+=======
+- 2026-08-11: Audited role-based attributes and permission boundaries across Student, Faculty, and Admin roles. Safeguarded `download_slip` group code check, created dedicated automated test suite (`users/tests/test_role_based_attributes.py`), expanding full test suite to 50 tests (all passing).
+- 2026-08-11: Transformed LabTrack into Production Mode: enforced mandatory production secret keys, integrated WhiteNoise middleware for WSGI static asset serving, added dynamic `DATABASE_URL` parsing (`dj-database-url`), structured console logging, system health check API (`GET /api/health/`), Gunicorn server configuration (`gunicorn.conf.py`), production `Dockerfile`, `docker-compose.yml`, Nginx configuration, Systemd unit files (`deploy/systemd/`), and `docs/PRODUCTION_DEPLOYMENT.md`.
+
+- 2026-08-10: Executed comprehensive architectural rework: extracted inventory reservation service (`inventory/services/reservation_service.py`), modularized monolithic `requests_app/views.py` into role-based package (`common.py`, `admin.py`, `faculty.py`, `actions.py`), updated `.gitignore` for `.env` exclusion, created `.env.example` template, and expanded unit test suite to 38 tests (all passing).
+
+- 2026-08-10: Audited system documentation, verified complete unit test suite (31 tests passing via venv), and synchronized system operations blueprint across repository docs.
+>>>>>>> e03ae81 (latest on 11aug2026)
 - 2026-03-05: Hardened profile integrity across roles: unique editable username, alphabet-only full name, India 10-digit phone validation, student/faculty email lock after verification, and admin email-change OTP flow with post-verify lock.
 - 2026-03-05: Added admin write APIs for policy and per-component fine overrides (`/api/admin/policy/`, `/api/admin/policy/update/`, `/api/admin/components/<id>/fines/`) and updated API tests/docs.
 - 2026-03-05: Refined lab-admin decision logic (priority inbox + urgent-first glimpse) and aligned `/api/admin/overview/` payload with new operational fields (`pending_groups_count`, `priority_items`).

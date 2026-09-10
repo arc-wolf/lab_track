@@ -1,0 +1,102 @@
+version: '3.8'
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: labtrack_web
+    restart: always
+    command: gunicorn -c gunicorn.conf.py config.wsgi:application
+    environment:
+      - DJANGO_ENV=production
+      - DJANGO_DEBUG=False
+      - DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY}
+      - DJANGO_ALLOWED_HOSTS=${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1}
+      - DJANGO_CSRF_TRUSTED_ORIGINS=${DJANGO_CSRF_TRUSTED_ORIGINS}
+      - DATABASE_URL=${DATABASE_URL:-postgres://labtrack_user:labtrack_pass@db:5432/labtrack}
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - DJANGO_CACHE_BACKEND=redis
+      - DJANGO_CACHE_URL=redis://redis:6379/1
+    volumes:
+      - static_volume:/app/staticfiles
+      - media_volume:/app/media
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+      - redis
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  celery_worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: labtrack_worker
+    restart: always
+    command: celery -A config worker -l info
+    environment:
+      - DJANGO_ENV=production
+      - DJANGO_DEBUG=False
+      - DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY}
+      - DATABASE_URL=${DATABASE_URL:-postgres://labtrack_user:labtrack_pass@db:5432/labtrack}
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - DJANGO_CACHE_BACKEND=redis
+      - DJANGO_CACHE_URL=redis://redis:6379/1
+    volumes:
+      - media_volume:/app/media
+    depends_on:
+      - db
+      - redis
+
+  celery_beat:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: labtrack_beat
+    restart: always
+    command: celery -A config beat -l info
+    environment:
+      - DJANGO_ENV=production
+      - DJANGO_DEBUG=False
+      - DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY}
+      - DATABASE_URL=${DATABASE_URL:-postgres://labtrack_user:labtrack_pass@db:5432/labtrack}
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    depends_on:
+      - db
+      - redis
+
+  redis:
+    image: redis:7-alpine
+    container_name: labtrack_redis
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+  db:
+    image: postgres:16-alpine
+    container_name: labtrack_db
+    restart: always
+    environment:
+      POSTGRES_DB: labtrack
+      POSTGRES_USER: labtrack_user
+      POSTGRES_PASSWORD: labtrack_pass
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+volumes:
+  static_volume:
+  media_volume:
+  redis_data:
+  postgres_data:

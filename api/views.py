@@ -314,6 +314,7 @@ def admin_update_component_fines(request, component_id: int):
     return JsonResponse({'component': serialize_component(component)})
 
 
+<<<<<<< HEAD
 @csrf_exempt
 @require_POST
 @token_auth_required
@@ -332,3 +333,48 @@ def ai_query(request):
 
     answer = ai_service.answer_query(query)
     return JsonResponse({'answer': answer})
+=======
+@require_GET
+def health_check(request):
+    """
+    Production health check endpoint verifying DB connection, Cache status,
+    and system availability. Returns HTTP 200 if healthy, HTTP 503 if unhealthy.
+    """
+    from django.db import connection
+    from django.core.cache import cache
+
+    status_details = {
+        'database': 'ok',
+        'cache': 'ok',
+    }
+    is_healthy = True
+
+    # 1. Test database connection
+    try:
+        connection.ensure_connection()
+    except Exception as exc:
+        status_details['database'] = f'error: {str(exc)}'
+        is_healthy = False
+
+    # 2. Test cache connection
+    try:
+        cache.set('health_check_ping', 'pong', timeout=10)
+        cached_val = cache.get('health_check_ping')
+        if cached_val != 'pong':
+            status_details['cache'] = 'error: cache set/get mismatch'
+            is_healthy = False
+    except Exception as exc:
+        status_details['cache'] = f'error: {str(exc)}'
+        is_healthy = False
+
+    http_status = 200 if is_healthy else 503
+    return JsonResponse(
+        {
+            'status': 'healthy' if is_healthy else 'unhealthy',
+            'components': status_details,
+            'environment': getattr(settings, 'ENVIRONMENT', 'production'),
+        },
+        status=http_status
+    )
+
+>>>>>>> e03ae81 (latest on 11aug2026)

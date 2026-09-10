@@ -16,6 +16,7 @@ from requests_app.services import get_requests_for_user
 from users.models import Group, GroupMember, Profile
 from .forms import ComponentForm
 from .models import Component, Reservation
+<<<<<<< HEAD
 from .services.cart_service import (
     CartAccessError,
     assert_group_cart_access,
@@ -23,6 +24,15 @@ from .services.cart_service import (
     sync_group_cart_lock,
 )
 from .services import excel_service
+=======
+from .services import (
+    ReservationError,
+    clean_expired_reservations as _clean_expired_reservations,
+    add_to_cart_reservation,
+    remove_cart_reservation,
+    create_borrow_request_from_cart,
+)
+>>>>>>> e03ae81 (latest on 11aug2026)
 
 
 # --------- helpers ---------------------------------------------------------
@@ -78,16 +88,6 @@ def _group_member_ids(group):
     if not group:
         return []
     return list(group.members.values_list("user_id", flat=True))
-
-
-def _clean_expired_reservations(user=None, user_ids=None):
-    qs = Reservation.objects.filter(is_active=True, expires_at__lte=timezone.now())
-    if user_ids is not None:
-        qs = qs.filter(user_id__in=user_ids)
-    elif user:
-        qs = qs.filter(user=user)
-    for res in qs.select_related("component"):
-        res.expire_and_release()
 
 
 # ---------------- Student flows -------------------------------------------
@@ -177,6 +177,7 @@ def add_to_cart(request, component_id):
         quantity = 0
     component = get_object_or_404(Component, id=component_id)
 
+<<<<<<< HEAD
     max_allowed = getattr(settings, "STUDENT_MAX_ACTIVE", 10)
     if max_allowed:
         if request.user.profile.role == Profile.ROLE_STUDENT and member_ids:
@@ -262,6 +263,23 @@ def add_to_cart(request, component_id):
             sync_group_cart_lock(group, request.user, all_reservations)
 
     messages.success(request, f"Reserved {quantity} x {component.name} for 15 minutes.")
+=======
+    try:
+        res, final_qty, is_new = add_to_cart_reservation(
+            user=request.user,
+            component=component,
+            quantity=quantity,
+            member_ids=member_ids if member_ids else None,
+        )
+    except ReservationError as exc:
+        messages.error(request, str(exc))
+        return redirect("student_dashboard")
+
+    if is_new:
+        messages.success(request, f"Reserved {quantity} x {component.name} for 15 minutes.")
+    else:
+        messages.success(request, f"Updated team cart for {component.name} (now {final_qty}).")
+>>>>>>> e03ae81 (latest on 11aug2026)
     return redirect("student_dashboard")
 
 
@@ -326,13 +344,13 @@ def remove_cart_item(request, reservation_id):
 
     group, _ = _ensure_group(request.user)
     member_ids = _group_member_ids(group) if request.user.profile.role == Profile.ROLE_STUDENT else []
-    if request.user.profile.role == Profile.ROLE_STUDENT and member_ids:
-        res = get_object_or_404(
-            Reservation,
-            id=reservation_id,
-            user_id__in=member_ids,
-            is_active=True,
+    try:
+        remove_cart_reservation(
+            user=request.user,
+            reservation_id=reservation_id,
+            member_ids=member_ids if member_ids else None,
         )
+<<<<<<< HEAD
     else:
         res = get_object_or_404(Reservation, id=reservation_id, user=request.user, is_active=True)
     with transaction.atomic():
@@ -351,6 +369,12 @@ def remove_cart_item(request, reservation_id):
                 Reservation.objects.filter(user_id__in=member_ids, is_active=True)
             )
             sync_group_cart_lock(group, request.user, remaining)
+=======
+    except ReservationError as exc:
+        messages.error(request, str(exc))
+        return redirect("view_cart")
+
+>>>>>>> e03ae81 (latest on 11aug2026)
     messages.info(request, "Reservation removed and stock restored.")
     return redirect("view_cart")
 
@@ -367,21 +391,12 @@ def generate_slip(request):
     if request.user.profile.role == Profile.ROLE_STUDENT and not is_group_approved:
         messages.error(request, "Group pending faculty approval. Borrowing is locked until approval.")
         return redirect("student_dashboard")
-    if request.user.profile.role == Profile.ROLE_STUDENT and member_ids:
-        reservations_qs = Reservation.objects.filter(user_id__in=member_ids, is_active=True)
-    else:
-        reservations_qs = Reservation.objects.filter(user=request.user, is_active=True)
-    reservations = list(
-        reservations_qs.select_related("component", "user").order_by("reserved_at")
-    )
-    if not reservations:
-        messages.error(request, "Your cart is empty or reservations expired.")
-        return redirect("view_cart")
 
     project_title = request.POST.get("project_title", "").strip()
     if not project_title:
         messages.error(request, "Project title is required.")
         return redirect("view_cart")
+<<<<<<< HEAD
     try:
         create_borrow_request_from_cart(
             actor=request.user,
@@ -389,6 +404,34 @@ def generate_slip(request):
             project_title=project_title,
         )
     except CartAccessError as exc:
+=======
+
+    faculty_user = request.user if is_faculty_user else None
+    if not is_faculty_user:
+        try:
+            if faculty_id:
+                faculty_user = Profile.objects.select_related("user").get(
+                    id=int(faculty_id), role=Profile.ROLE_FACULTY
+                ).user
+        except (Profile.DoesNotExist, ValueError):
+            faculty_user = None
+    if not faculty_user:
+        messages.error(request, "Selected faculty not found.")
+        return redirect("view_cart")
+    if group and group.faculty_id and group.faculty_id != faculty_user.id:
+        messages.error(request, "Selected faculty does not match your approved group in-charge.")
+        return redirect("view_cart")
+
+    try:
+        create_borrow_request_from_cart(
+            user=request.user,
+            faculty_user=faculty_user,
+            project_title=project_title,
+            group=group,
+            member_ids=member_ids if member_ids else None,
+        )
+    except ReservationError as exc:
+>>>>>>> e03ae81 (latest on 11aug2026)
         messages.error(request, str(exc))
         return redirect("view_cart")
 

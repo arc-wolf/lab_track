@@ -314,7 +314,6 @@ def admin_update_component_fines(request, component_id: int):
     return JsonResponse({'component': serialize_component(component)})
 
 
-<<<<<<< HEAD
 @csrf_exempt
 @require_POST
 @token_auth_required
@@ -333,7 +332,6 @@ def ai_query(request):
 
     answer = ai_service.answer_query(query)
     return JsonResponse({'answer': answer})
-=======
 @require_GET
 def health_check(request):
     """
@@ -377,4 +375,3 @@ def health_check(request):
         status=http_status
     )
 
->>>>>>> e03ae81 (latest on 11aug2026)

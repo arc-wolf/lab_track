@@ -10,7 +10,7 @@ from django.conf import settings
 from django.db.models import Count, Q
 from django.utils import timezone
 from django.views.decorators.http import require_POST
-from random import randint
+import secrets
 import logging
 import hashlib
 import re
@@ -109,7 +109,7 @@ class LabTrackLoginView(LoginView):
 
 
 def _generate_otp_code() -> str:
-    return f"{randint(0, 999999):06d}"
+    return f"{secrets.randbelow(1_000_000):06d}"
 
 
 def _send_otp_email(target_email: str, code: str, purpose_label: str):
